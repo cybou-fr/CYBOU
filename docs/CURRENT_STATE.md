@@ -829,6 +829,11 @@ supersedes the shell half of [ADR-0040](adr/ADR-0040-spatial-card-desktop-and-bo
 It refuses to start as root, binds a per-UID socket its systemd instance created, and spawns that
 account's login shell from the passwd database rather than a guess.
 
+Files can open a new terminal in its successfully listed home directory. `OpenAt` carries the host
+path to the per-account owner, which resolves it and sets the child's working directory without
+injecting shell input. Existing sessions are not redirected. See [Files to Terminal](evidence/desktop-browser-gate.md#files-to-terminal-2026-09-07)
+for the browser, transport and real-shell checks and the remaining reload limitation.
+
 Nothing inside the terminal is filtered, and that is the decision rather than an omission: command
 filtering on a real shell is theatre, and a filter that can be defeated is worse than an absent one
 because it is believed. The boundary is the account, held by the kernel, as it is for SSH. A terminal
@@ -1361,6 +1366,10 @@ now a cache in front of it rather than the only copy. The gateway keeps the layo
 string: parsing it there would be a second implementation of a schema the frontend owns. A seat that
 has never saved gets `null` rather than an empty desktop, so a first sign-in does not wipe what a
 browser already had, and a reader with no seat is refused rather than handed a shared arrangement.
+Writes now carry a content revision checked atomically by SQLite. The browser waits for its first
+read, serializes saves, and asks which layout to keep when another tab changed it or a late read
+would discard local edits. Pending changes and failures are visible, and navigation warns before
+leaving pending account layout changes. See [conditional desktop saves](evidence/desktop-browser-gate.md#conditional-desktop-saves-2026-09-07).
 
 - **The tool panels say how old they are**: Monitor, Services, Processes and the log viewer re-read
 on their own timers and render the age of the last reading. The `auto_refresh` flag that had been on

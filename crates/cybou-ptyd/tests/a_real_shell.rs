@@ -246,3 +246,116 @@ async fn a_declared_length_nobody_intends_to_send_allocates_nothing() {
     );
     assert!(u32::MAX as usize > MAX_FRAME_BYTES);
 }
+
+async fn assert_start_directory(directory: &std::path::Path) {
+    let expected = directory
+        .canonicalize()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
+    let (mut gateway, handle) = start();
+    send(
+        &mut gateway,
+        &FromGateway::OpenAt {
+            columns: 80,
+            rows: 24,
+            directory: expected.clone(),
+        },
+    )
+    .await;
+    assert_eq!(receive(&mut gateway).await, Some(FromOwner::Opened));
+    // Put the answer on its own line even when a prompt has already been printed.
+    send(
+        &mut gateway,
+        &FromGateway::Input(b"printf '\\n'; pwd -P\n".to_vec()),
+    )
+    .await;
+    let mut seen = String::new();
+    let result = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match receive(&mut gateway).await {
+                Some(FromOwner::Output(bytes)) => {
+                    seen.push_str(&String::from_utf8_lossy(&bytes));
+                    if seen
+                        .lines()
+                        .any(|line| line.trim_end_matches('\r') == expected)
+                    {
+                        break;
+                    }
+                }
+                other => {
+                    panic!("session ended before reporting its directory: {other:?}; {seen:?}")
+                }
+            }
+        }
+    })
+    .await;
+    assert!(
+        result.is_ok(),
+        "expected directory {expected:?}; actual output {seen:?}"
+    );
+    drop(gateway);
+    tokio::time::timeout(std::time::Duration::from_secs(5), handle)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+async fn directories_are_child_local_and_shell_metacharacters_stay_literal() {
+    let before = std::env::current_dir().unwrap();
+    let unique = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("cybou-pty-{}-{unique}", std::process::id()));
+    let first = root.join("project space ' ; $(printf injected)");
+    let second = root.join("second");
+    std::fs::create_dir_all(&first).unwrap();
+    std::fs::create_dir(&second).unwrap();
+    tokio::join!(
+        assert_start_directory(&first),
+        assert_start_directory(&second)
+    );
+    assert_eq!(std::env::current_dir().unwrap(), before);
+    std::fs::remove_dir(first).unwrap();
+    std::fs::remove_dir(second).unwrap();
+    std::fs::remove_dir(root).unwrap();
+}
+
+#[tokio::test]
+async fn an_unusable_directory_never_falls_back_to_another_folder() {
+    for directory in ["relative", "", "/etc/passwd", "/tmp/../tmp", "/tmp/\0bad"] {
+        let (mut gateway, handle) = start();
+        send(
+            &mut gateway,
+            &FromGateway::OpenAt {
+                columns: 80,
+                rows: 24,
+                directory: directory.into(),
+            },
+        )
+        .await;
+        assert_eq!(
+            receive(&mut gateway).await,
+            Some(FromOwner::Refused(Refusal::DirectoryUnavailable)),
+            "{directory:?}"
+        );
+        handle.await.unwrap();
+    }
+    let (mut gateway, handle) = start();
+    send(
+        &mut gateway,
+        &FromGateway::OpenAt {
+            columns: 0,
+            rows: 24,
+            directory: "/tmp".into(),
+        },
+    )
+    .await;
+    assert_eq!(
+        receive(&mut gateway).await,
+        Some(FromOwner::Refused(Refusal::ImpossibleWindow))
+    );
+    handle.await.unwrap();
+}

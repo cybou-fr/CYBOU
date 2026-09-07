@@ -24,6 +24,7 @@ use axum::{
 };
 use cybou_web_contracts::{DesktopLayoutProjection, DesktopLayoutSaveRequest, WEB_SCHEMA_V1};
 use rusqlite::{Connection, OptionalExtension, params};
+use sha2::{Digest, Sha256};
 use std::path::Path;
 use std::sync::{Arc, Mutex, PoisonError};
 use time::OffsetDateTime;
@@ -45,6 +46,8 @@ pub enum WorkspaceStoreError {
     StorageUnavailable,
     /// The arrangement is larger than [`LAYOUT_MAX_BYTES`].
     LayoutTooLarge,
+    /// Another writer changed the arrangement since it was read.
+    Conflict,
 }
 
 /// One person's desktop arrangement, kept per authenticated seat.
@@ -117,15 +120,46 @@ impl WorkspaceStore {
     ///
     /// # Errors
     ///
-    /// Returns [`WorkspaceStoreError::LayoutTooLarge`] past the size cap, or
+    /// Returns [`WorkspaceStoreError::Conflict`] when a newer arrangement exists,
+    /// [`WorkspaceStoreError::LayoutTooLarge`] past the size cap, or
     /// [`WorkspaceStoreError::StorageUnavailable`] when the database cannot be written.
-    pub fn save(&self, principal: &str, layout: &str) -> Result<i64, WorkspaceStoreError> {
+    pub fn save(
+        &self,
+        principal: &str,
+        layout: &str,
+        expected_revision: Option<&str>,
+    ) -> Result<i64, WorkspaceStoreError> {
         if layout.len() > LAYOUT_MAX_BYTES {
             return Err(WorkspaceStoreError::LayoutTooLarge);
         }
         let now = OffsetDateTime::now_utc().unix_timestamp();
-        let connection = self.inner.lock().unwrap_or_else(PoisonError::into_inner);
-        connection
+        let mut connection = self.inner.lock().unwrap_or_else(PoisonError::into_inner);
+        let transaction = connection
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(|_| WorkspaceStoreError::StorageUnavailable)?;
+        let current: Option<(String, i64)> = transaction
+            .query_row(
+                "SELECT payload, updated_at FROM desktop_layouts WHERE principal = ?1",
+                params![principal],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(|_| WorkspaceStoreError::StorageUnavailable)?;
+        // A lost acknowledgement can be retried without overwriting anybody's work.
+        if let Some((payload, saved_at)) = &current
+            && payload == layout
+        {
+            return Ok(*saved_at);
+        }
+        if current
+            .as_ref()
+            .map(|(payload, _)| revision(payload))
+            .as_deref()
+            != expected_revision
+        {
+            return Err(WorkspaceStoreError::Conflict);
+        }
+        transaction
             .execute(
                 "INSERT INTO desktop_layouts (principal, payload, bytes, updated_at)
                  VALUES (?1, ?2, ?3, ?4)
@@ -140,6 +174,9 @@ impl WorkspaceStore {
                 ],
             )
             .map_err(|_| WorkspaceStoreError::StorageUnavailable)?;
+        transaction
+            .commit()
+            .map_err(|_| WorkspaceStoreError::StorageUnavailable)?;
         Ok(now)
     }
 }
@@ -151,6 +188,16 @@ impl Default for WorkspaceStore {
 }
 
 type Refusal = (StatusCode, Json<ErrorBody>);
+
+fn revision(layout: &str) -> String {
+    Sha256::digest(layout.as_bytes())
+        .iter()
+        .fold(String::with_capacity(64), |mut output, byte| {
+            use std::fmt::Write as _;
+            let _ = write!(output, "{byte:02x}");
+            output
+        })
+}
 
 fn no_seat() -> Refusal {
     // An arrangement belongs to an account rather than to a browser, which is the whole reason it
@@ -168,6 +215,7 @@ fn no_seat() -> Refusal {
 
 fn store_refusal(error: WorkspaceStoreError) -> Refusal {
     let (status, code, retryable) = match error {
+        WorkspaceStoreError::Conflict => (StatusCode::CONFLICT, "workspaceLayoutConflict", false),
         WorkspaceStoreError::LayoutTooLarge => (
             StatusCode::PAYLOAD_TOO_LARGE,
             "workspaceLayoutTooLarge",
@@ -221,6 +269,7 @@ pub async fn get_layout_handler(
         None => (None, None),
     };
     Ok(Json(DesktopLayoutProjection {
+        revision: layout.as_deref().map(revision),
         schema_version: WEB_SCHEMA_V1,
         layout,
         updated_at_utc,
@@ -244,11 +293,14 @@ pub async fn save_layout_handler(
     let workspace = state.workspace.clone();
     let layout = payload.layout;
     let stored = layout.clone();
-    let updated_at = tokio::task::spawn_blocking(move || workspace.save(&principal, &stored))
-        .await
-        .map_err(|_| store_refusal(WorkspaceStoreError::StorageUnavailable))?
-        .map_err(store_refusal)?;
+    let updated_at = tokio::task::spawn_blocking(move || {
+        workspace.save(&principal, &stored, payload.expected_revision.as_deref())
+    })
+    .await
+    .map_err(|_| store_refusal(WorkspaceStoreError::StorageUnavailable))?
+    .map_err(store_refusal)?;
     Ok(Json(DesktopLayoutProjection {
+        revision: Some(revision(&layout)),
         schema_version: WEB_SCHEMA_V1,
         layout: Some(layout),
         updated_at_utc: Some(as_rfc3339(updated_at)),
@@ -260,9 +312,70 @@ mod tests {
     use super::*;
 
     #[test]
+    fn independent_connections_and_restarts_keep_the_same_write_boundary() {
+        let path =
+            std::env::temp_dir().join(format!("cybou-layout-{}.sqlite3", uuid::Uuid::new_v4()));
+        {
+            let first = WorkspaceStore::open(&path).unwrap();
+            let second = WorkspaceStore::open(&path).unwrap();
+            first.save("alice", "one", None).unwrap();
+            second.save("alice", "two", Some(&revision("one"))).unwrap();
+            assert_eq!(
+                first.save("alice", "stale", Some(&revision("one"))),
+                Err(WorkspaceStoreError::Conflict)
+            );
+        }
+        {
+            let reopened = WorkspaceStore::open(&path).unwrap();
+            assert_eq!(reopened.load("alice").unwrap().unwrap().0, "two");
+            reopened
+                .save("alice", "three", Some(&revision("two")))
+                .unwrap();
+        }
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn stale_tabs_cannot_overwrite_a_newer_arrangement() {
+        let store = WorkspaceStore::new();
+        store.save("alice", "initial", None).expect("create");
+        let base = revision("initial");
+        store
+            .save("alice", "tab one", Some(&base))
+            .expect("first writer");
+        assert_eq!(
+            store.save("alice", "tab two", Some(&base)),
+            Err(WorkspaceStoreError::Conflict)
+        );
+        assert_eq!(
+            store.save("alice", "legacy client", None),
+            Err(WorkspaceStoreError::Conflict)
+        );
+        assert_eq!(store.load("alice").unwrap().unwrap().0, "tab one");
+        assert_eq!(
+            store_refusal(WorkspaceStoreError::Conflict).0,
+            StatusCode::CONFLICT
+        );
+    }
+
+    #[test]
+    fn a_lost_acknowledgement_can_be_retried_without_changing_the_record() {
+        let store = WorkspaceStore::new();
+        let saved = store.save("alice", "first", None).unwrap();
+        assert_eq!(store.save("alice", "first", None), Ok(saved));
+        store
+            .save("alice", "second", Some(&revision("first")))
+            .unwrap();
+        assert_eq!(
+            store.save("alice", "first", None),
+            Err(WorkspaceStoreError::Conflict)
+        );
+    }
+
+    #[test]
     fn an_arrangement_comes_back_to_the_seat_that_saved_it_and_to_no_other() {
         let store = WorkspaceStore::new();
-        store.save("alice", "{\"cards\":[]}").expect("save");
+        store.save("alice", "{\"cards\":[]}", None).expect("save");
 
         assert_eq!(
             store
@@ -280,8 +393,10 @@ mod tests {
         // A desktop is saved on every drag. Rows per drag would be a disk filling up in the shape
         // of somebody tidying their workspace.
         let store = WorkspaceStore::new();
-        store.save("alice", "first").expect("save");
-        store.save("alice", "second").expect("save");
+        store.save("alice", "first", None).expect("save");
+        store
+            .save("alice", "second", Some(&revision("first")))
+            .expect("save");
         assert_eq!(
             store
                 .load("alice")
@@ -296,7 +411,7 @@ mod tests {
         let store = WorkspaceStore::new();
         let oversized = "x".repeat(LAYOUT_MAX_BYTES + 1);
         assert_eq!(
-            store.save("alice", &oversized),
+            store.save("alice", &oversized, None),
             Err(WorkspaceStoreError::LayoutTooLarge)
         );
         assert_eq!(store.load("alice").expect("load"), None);

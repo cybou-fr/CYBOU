@@ -89,6 +89,9 @@ pub fn CardFrame(
         if focused {
             return true;
         }
+        if representation() == crate::PanelRepresentation::Glance {
+            return false;
+        }
         camera.is_none_or(|camera| crate::layout::camera::detail_at(camera.zoom.get()).shows_body())
     };
 
@@ -129,6 +132,9 @@ pub fn CardFrame(
                             <span class="panel-organ" title="The organ that composed this">
                                 {kicker_title}
                             </span>
+                        </Show>
+                        <Show when=move || representation() != crate::PanelRepresentation::Standard>
+                            <span class="panel-representation-badge">{move || representation().label()}</span>
                         </Show>
                     </small>
                     <CardControls card=card layout=layout />

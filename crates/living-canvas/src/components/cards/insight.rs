@@ -162,6 +162,28 @@ fn FindingRow(finding: FindingProjection, runtime: RwSignal<RuntimeState>) -> im
 
     let finding_id = finding.id;
 
+    let layout = use_context::<RwSignal<crate::DesktopLayout>>();
+    let tool_states = expect_context::<crate::tool_state::ToolCardStates>();
+    let inspect_finding = {
+        let about = finding.about.clone();
+        let first_subject = finding.readings.first().map(|r| r.subject.clone());
+        move |_| {
+            let target_name = about.as_ref().or(first_subject.as_ref()).cloned();
+            if let Some(target) = target_name {
+                let clean_name = target.strip_prefix("service:").unwrap_or(&target).to_owned();
+                let inspector_signals = tool_states.inspector(crate::CardId::Inspector(0));
+                inspector_signals.subject_query.set(None);
+                inspector_signals.target_subject.set(Some(cybou_protocol::SubjectRef::Service {
+                    name: clean_name,
+                    node_id: None,
+                }));
+            }
+            if let Some(lay) = layout {
+                crate::interaction::spawn_or_focus_card(lay, crate::CardId::Inspector(0), Some(crate::CardId::Insight));
+            }
+        }
+    };
+
     // What Action1 actually holds about this finding, if it is waiting on a person.
     //
     // Deliberately read off the record rather than off the offer beside it. An offer is this
@@ -247,7 +269,16 @@ fn FindingRow(finding: FindingProjection, runtime: RwSignal<RuntimeState>) -> im
         <div class="finding-line">
             <span class="finding-head">
                 <b>{crate::heading::finding_title(&finding)}</b>
-                <small class="finding-strength">{strength}</small>
+                <span style="display: flex; align-items: center; gap: 6px;">
+                    <small class="finding-strength">{strength}</small>
+                    <button
+                        style="background: var(--accent-fill); border: 1px solid var(--accent-line); border-radius: 3px; padding: 1px 6px; font-size: 10px; color: var(--accent-light); cursor: pointer;"
+                        title="Investigate finding in Universal Inspector"
+                        on:click=inspect_finding
+                    >
+                        "Investigate"
+                    </button>
+                </span>
             </span>
             <small class="finding-since">{format!("since {since}")}</small>
 

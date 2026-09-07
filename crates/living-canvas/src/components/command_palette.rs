@@ -9,7 +9,7 @@ use web_sys::KeyboardEvent;
 
 use crate::interaction::usable_viewport;
 use crate::{
-    ArrangementMode, CardId, DesktopItemId, DesktopLayout, LayoutHistory,
+    ArrangementMode, CardId, DesktopItemId, DesktopLayout, LayoutHistory, MindClient,
     components::icons::{
         IconExternalLink, IconGrid, IconLayers, IconMaximize, IconMinimize, IconPin, IconRedo,
         IconRefresh, IconUndo,
@@ -726,6 +726,39 @@ pub fn CommandPalette(
 
     let ask_answer = move || crate::state::ask_cybou(&command_query.get(), &runtime.get());
 
+    let (meaning_result, set_meaning_result) = signal(Option::<cybou_web_contracts::MeaningInterpretProjection>::None);
+    let (_meaning_loading, set_meaning_loading) = signal(false);
+
+    Effect::new(move |_| {
+        let q = command_query.get();
+        let trimmed = q.trim().to_owned();
+        if trimmed.len() < 3 || ask_answer().is_some() {
+            set_meaning_result.set(None);
+            set_meaning_loading.set(false);
+            return;
+        }
+        set_meaning_loading.set(true);
+        leptos::task::spawn_local(async move {
+            let req = cybou_web_contracts::MeaningInterpretRequest {
+                utterance: trimmed,
+                language: None,
+            };
+            match crate::GatewayMindClient.interpret_meaning(&req).await {
+                Ok(proj) => {
+                    if command_query.get_untracked() == q {
+                        set_meaning_result.set(Some(proj));
+                    }
+                }
+                Err(_) => {
+                    if command_query.get_untracked() == q {
+                        set_meaning_result.set(None);
+                    }
+                }
+            }
+            set_meaning_loading.set(false);
+        });
+    });
+
     view! {
         <section class="command-palette" aria-label="Action launcher">
             <Show when=move || command_open.get()>
@@ -755,6 +788,52 @@ pub fn CommandPalette(
                                 </div>
                             }
                         })
+                    }}
+
+                    {move || {
+                        if ask_answer().is_none() {
+                            meaning_result.get().map(|proj| {
+                                let act_kind = proj.interpretation.primary_act.kind;
+                                let kind_str = format!("{act_kind:?}");
+                                let realization = proj.realization.clone();
+                                let plan_intent = proj.response_plan.as_ref().map(|p| p.intent.clone());
+                                let target_card = match act_kind {
+                                    cybou_web_contracts::CognitiveActKind::Inspect => CardId::Inspector(0),
+                                    _ => CardId::Meaning(0),
+                                };
+                                let btn_label = match act_kind {
+                                    cybou_web_contracts::CognitiveActKind::Inspect => "Open Universal Inspector",
+                                    _ => "Open Meaning1 Assistant",
+                                };
+
+                                view! {
+                                    <div class="ask-cybou-card">
+                                        <div class="ask-cybou-header">
+                                            <Sparkles size=14 />
+                                            <b>"Meaning1 Cognitive Act"</b>
+                                            <span class="ask-cybou-headline">{kind_str}</span>
+                                        </div>
+                                        {realization.map(|text| view! {
+                                            <p class="ask-cybou-detail">{text}</p>
+                                        })}
+                                        {plan_intent.map(|intent| view! {
+                                            <div style="font-size: 10px; color: var(--text-dim); margin-bottom: 6px;">
+                                                "Plan: " <span style="color: var(--accent-light); font-family: monospace;">{intent}</span>
+                                            </div>
+                                        })}
+                                        <button
+                                            type="button"
+                                            class="ask-cybou-action-btn"
+                                            on:click=move |_| focus_or_open_card(target_card)
+                                        >
+                                            {btn_label}
+                                        </button>
+                                    </div>
+                                }
+                            })
+                        } else {
+                            None
+                        }
                     }}
 
                     <Show
@@ -830,7 +909,13 @@ pub fn CommandPalette(
                             } else if let Some(ans) = ask_answer()
                                 && let Some((_, card)) = ans.target {
                                     focus_or_open_card(card);
-                                }
+                            } else if let Some(proj) = meaning_result.get() {
+                                let target_card = match proj.interpretation.primary_act.kind {
+                                    cybou_web_contracts::CognitiveActKind::Inspect => CardId::Inspector(0),
+                                    _ => CardId::Meaning(0),
+                                };
+                                focus_or_open_card(target_card);
+                            }
                         } else if key == "Escape" {
                             set_command_open.set(false);
                         }

@@ -120,9 +120,7 @@ pub fn App() -> impl IntoView {
         let inspector_state = tool_states.inspector(inspector);
         inspector_state.subject_query.set(None);
         inspector_state.target_subject.set(Some(subject));
-        layout.update(|desktop| desktop.open_card(inspector, 380.0, 150.0));
-        layout.get_untracked().save();
-        set_selected.set(Some(living_canvas::DesktopItemId::Card(inspector)));
+        living_canvas::interaction::spawn_or_focus_card(layout, inspector, None);
     };
 
     #[cfg(target_arch = "wasm32")]
@@ -158,11 +156,18 @@ pub fn App() -> impl IntoView {
     // exists, make navigation honest and interrupt accidental loss of browser-only buffers.
     #[cfg(target_arch = "wasm32")]
     if let Some(window) = web_sys::window() {
+        let workspace_sync =
+            use_context::<RwSignal<living_canvas::workspace_sync::WorkspaceSync>>();
         let on_before_unload =
             Closure::<dyn FnMut(BeforeUnloadEvent)>::new(move |event: BeforeUnloadEvent| {
-                if tool_states.has_unsaved_editor_buffers() {
+                let layout_pending = workspace_sync.is_some_and(|state| {
+                    state.get_untracked().has_pending_changes(
+                        &serde_json::to_string(&layout.get_untracked()).unwrap_or_default(),
+                    )
+                });
+                if tool_states.has_unsaved_editor_buffers() || layout_pending {
                     event.prevent_default();
-                    event.set_return_value("Unsaved CYBOU editor buffers will be lost.");
+                    event.set_return_value("CYBOU has unsaved changes.");
                 }
             });
         let _ = window.add_event_listener_with_callback(

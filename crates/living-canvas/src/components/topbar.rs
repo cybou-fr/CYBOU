@@ -126,6 +126,7 @@ pub fn Topbar(
             </a>
 
             <div class="topbar-center">
+                <crate::workspace_sync::WorkspaceSyncStatus />
                 <span
                     class="status-pill"
                     class:online=move || matches!(runtime.get(), RuntimeState::Ready { .. })

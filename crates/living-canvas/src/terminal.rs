@@ -16,6 +16,22 @@
 //! So the browser keeps a screen: a grid of cells with a cursor, fed bytes, read back as rows. The
 //! state lives here and not in the DOM, which also means the whole of it is testable without one.
 
+/// Explicit directory launches use a distinct frame so older owners refuse rather than ignore it.
+pub fn opening_frame(
+    columns: u16,
+    rows: u16,
+    directory: Option<String>,
+) -> cybou_web_contracts::TerminalFromGateway {
+    match directory {
+        Some(directory) => cybou_web_contracts::TerminalFromGateway::OpenAt {
+            columns,
+            rows,
+            directory,
+        },
+        None => cybou_web_contracts::TerminalFromGateway::Open { columns, rows },
+    }
+}
+
 use std::fmt::Write as _;
 
 use serde::{Deserialize, Serialize};

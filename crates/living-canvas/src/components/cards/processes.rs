@@ -83,11 +83,15 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
         });
     };
 
+    let layout = use_context::<RwSignal<crate::DesktopLayout>>();
     let inspect_process = move |pid: u32, name: String| {
         let inspector_signals = tool_states.inspector(CardId::Inspector(0));
         inspector_signals
             .target_subject
             .set(Some(SubjectRef::Process { pid, name }));
+        if let Some(lay) = layout {
+            crate::interaction::spawn_or_focus_card(lay, CardId::Inspector(0), Some(card));
+        }
     };
 
     // Trigger initial load

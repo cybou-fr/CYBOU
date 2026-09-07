@@ -1062,6 +1062,22 @@ mod tests {
             .expect("save response");
         assert_eq!(saved.status(), StatusCode::OK);
 
+        // A second tab that read the same empty account must not replace the first save.
+        let stale = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri("/api/v1/desktop/layout")
+                    .header("cookie", &first)
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"layout":"stale tab"}"#))
+                    .expect("stale write"),
+            )
+            .await
+            .expect("conflict response");
+        assert_eq!(stale.status(), StatusCode::CONFLICT);
+
         let logged_out = app
             .clone()
             .oneshot(

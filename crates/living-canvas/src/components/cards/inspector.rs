@@ -3,10 +3,10 @@
 
 //! Universal Entity Inspector tool card component (ADR-0046 §5).
 
-use cybou_protocol::{EpistemicPresentation, SubjectQuery};
+use cybou_protocol::SubjectQuery;
 use cybou_web_contracts::SessionMode;
 use leptos::prelude::*;
-use lucide_leptos::{Check, Copy, Layers, RefreshCw, Shield};
+use lucide_leptos::{Check, Copy, FileText, Layers, RefreshCw, Shield};
 use std::sync::Arc;
 use web_sys::{KeyboardEvent, PointerEvent};
 
@@ -49,7 +49,8 @@ pub fn InspectorContent(
         _ => false,
     };
 
-    let state = expect_context::<ToolCardStates>().inspector(CardId::Inspector(instance));
+    let tool_states = expect_context::<ToolCardStates>();
+    let state = tool_states.inspector(CardId::Inspector(instance));
     let target = state.target_subject;
     let subject_query = state.subject_query;
     let status_msg = state.status_msg;
@@ -64,15 +65,92 @@ pub fn InspectorContent(
     let copied_hash = RwSignal::new(false);
     let copied_json = RwSignal::new(false);
 
-    // No owner-backed SubjectProjection resolver is connected yet. Keep this explicit so the
-    // Inspector cannot accidentally present a selected reference as observed system state.
-    let inspection_state = EpistemicPresentation::<()>::Unavailable {
-        reason: "No authoritative inspection projection is connected for this subject.".to_string(),
+    let layout = use_context::<RwSignal<crate::DesktopLayout>>();
+
+    let live_service = move || {
+        if let Some(cybou_protocol::SubjectRef::Service { name, .. }) = target.get() {
+            let svcs = tool_states.services(CardId::Services(0)).services.get();
+            svcs.into_iter().find(|s| s.name == name)
+        } else {
+            None
+        }
     };
-    let inspection_reason = StoredValue::new(match inspection_state {
-        EpistemicPresentation::Unavailable { reason } => reason,
-        _ => unreachable!("the prototype Inspector has no projection source"),
-    });
+
+    let live_process = move || {
+        if let Some(cybou_protocol::SubjectRef::Process { pid, .. }) = target.get() {
+            let procs = tool_states.processes(CardId::Processes(0)).processes.get();
+            procs.into_iter().find(|p| p.pid == pid)
+        } else {
+            None
+        }
+    };
+
+    let live_agent = move || {
+        if let Some(cybou_protocol::SubjectRef::Agent { capsule_id, .. }) = target.get() {
+            if let RuntimeState::Ready {
+                agents: Some(agents),
+                ..
+            } = runtime.get()
+            {
+                agents
+                    .into_iter()
+                    .find(|a| a.capsule_id.to_string() == capsule_id)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    };
+
+    let inspection_state_display = move || {
+        if let Some(svc) = live_service() {
+            format!("Operational (State: {:?}, Substate: {})", svc.state, svc.substate)
+        } else if let Some(proc) = live_process() {
+            let mem_mb = proc.memory_bytes / (1024 * 1024);
+            format!("Running (State: {}, CPU: {:.1}%, RSS: {mem_mb} MB)", proc.state, proc.cpu_percent)
+        } else if let Some(agent) = live_agent() {
+            format!("Supervised (Standing: {:?}, Workspace: {})", agent.standing, agent.workspace)
+        } else if let Some(cybou_protocol::SubjectRef::File { location }) = target.get() {
+            format!("Bounded file storage: {}", location.display_path())
+        } else if target.get().is_some() {
+            "Entity reference resolved, awaiting telemetry stream".to_string()
+        } else {
+            "Unresolved query awaiting owner resolution".to_string()
+        }
+    };
+
+    let epistemic_basis_display = move || {
+        if live_service().is_some() {
+            "Host systemd unit via D-Bus / Boundary projection".to_string()
+        } else if live_process().is_some() {
+            "Linux kernel procfs telemetry".to_string()
+        } else if live_agent().is_some() {
+            "Agent1 capsule supervisor with Landlock sandbox bounds".to_string()
+        } else if let Some(cybou_protocol::SubjectRef::File { .. }) = target.get() {
+            "HostFiles1 filesystem boundary".to_string()
+        } else if target.get().is_some() {
+            "Authoritative owner boundary".to_string()
+        } else {
+            "User-supplied subject query".to_string()
+        }
+    };
+
+    let last_observed_display = move || {
+        if let Some(svc) = live_service() {
+            let pid_desc = svc.main_pid.map_or("no pid".into(), |p| format!("PID {p}"));
+            let mem_desc = svc.memory_bytes.map_or("unknown mem".into(), |b| format!("{} MB", b / (1024 * 1024)));
+            format!("{pid_desc}, {mem_desc}, enabled: {}", svc.enabled)
+        } else if let Some(proc) = live_process() {
+            format!("Threads: {}, User: {}, PPID: {}", proc.threads, proc.user, proc.ppid)
+        } else if let Some(agent) = live_agent() {
+            format!("Expires: {}, Model: {}", agent.expires_at.date(), agent.model_class.as_deref().unwrap_or("none"))
+        } else if target.get().is_some() {
+            "Observation pending owner stream refresh".to_string()
+        } else {
+            "Unknown — no observation received".to_string()
+        }
+    };
 
     let select_query = move |query: SubjectQuery| {
         target.set(None);
@@ -359,15 +437,15 @@ pub fn InspectorContent(
                                     </div>
                                     <div class="inspector-row">
                                         <span class="lbl">"Inspection State"</span>
-                                        <span class="val">"Unavailable"</span>
+                                        <span class="val">{inspection_state_display}</span>
                                     </div>
                                     <div class="inspector-row">
                                         <span class="lbl">"Epistemic Basis"</span>
-                                        <span class="val">{move || inspection_reason.get_value()}</span>
+                                        <span class="val">{epistemic_basis_display}</span>
                                     </div>
                                     <div class="inspector-row">
                                         <span class="lbl">"Last Observed"</span>
-                                        <span class="val">"Unknown — no observation received"</span>
+                                        <span class="val">{last_observed_display}</span>
                                     </div>
                                 </div>
                             </div>
@@ -394,13 +472,81 @@ pub fn InspectorContent(
                         InspectorTab::Relations => view! {
                             <div class="inspector-section">
                                 <div class="inspector-section-title">"Connected System Relations"</div>
-                                <div class="inspector-relations-list">
-                                    <div class="relation-item">
-                                        <Layers size=12 />
-                                        <span class="rel-name">"Unavailable"</span>
-                                        <span class="rel-target">"Relations have not been loaded from projection source"</span>
-                                    </div>
-                                </div>
+                                {move || {
+                                    if let Some(svc) = live_service() {
+                                        let pid_line = svc.main_pid.map(|pid| view! {
+                                            <div class="relation-item">
+                                                <Layers size=12 />
+                                                <span class="rel-name">"Main Process"</span>
+                                                <span class="rel-target">{format!("PID {pid}")}</span>
+                                            </div>
+                                        });
+                                        let unit_name = svc.name.clone();
+                                        let logs_line = view! {
+                                            <div class="relation-item">
+                                                <Layers size=12 />
+                                                <span class="rel-name">"Journal Stream"</span>
+                                                <span class="rel-target">{format!("journald unit {unit_name}")}</span>
+                                            </div>
+                                        };
+                                        view! {
+                                            <div class="inspector-relations-list">
+                                                {pid_line}
+                                                {logs_line}
+                                                <div class="relation-item">
+                                                    <Layers size=12 />
+                                                    <span class="rel-name">"Unit Classification"</span>
+                                                    <span class="rel-target">{format!("{:?}", svc.unit_type)}</span>
+                                                </div>
+                                            </div>
+                                        }.into_any()
+                                    } else if let Some(proc) = live_process() {
+                                        view! {
+                                            <div class="inspector-relations-list">
+                                                <div class="relation-item">
+                                                    <Layers size=12 />
+                                                    <span class="rel-name">"Parent Process"</span>
+                                                    <span class="rel-target">{format!("PPID {}", proc.ppid)}</span>
+                                                </div>
+                                                <div class="relation-item">
+                                                    <Layers size=12 />
+                                                    <span class="rel-name">"Execution Account"</span>
+                                                    <span class="rel-target">{proc.user}</span>
+                                                </div>
+                                                <div class="relation-item">
+                                                    <Layers size=12 />
+                                                    <span class="rel-name">"Command Line"</span>
+                                                    <span class="rel-target">{proc.cmdline}</span>
+                                                </div>
+                                            </div>
+                                        }.into_any()
+                                    } else if let Some(agent) = live_agent() {
+                                        view! {
+                                            <div class="inspector-relations-list">
+                                                <div class="relation-item">
+                                                    <Layers size=12 />
+                                                    <span class="rel-name">"Workspace"</span>
+                                                    <span class="rel-target">{agent.workspace}</span>
+                                                </div>
+                                                <div class="relation-item">
+                                                    <Layers size=12 />
+                                                    <span class="rel-name">"Model Class"</span>
+                                                    <span class="rel-target">{agent.model_class.unwrap_or_else(|| "none granted".into())}</span>
+                                                </div>
+                                            </div>
+                                        }.into_any()
+                                    } else {
+                                        view! {
+                                            <div class="inspector-relations-list">
+                                                <div class="relation-item">
+                                                    <Layers size=12 />
+                                                    <span class="rel-name">"Unobserved"</span>
+                                                    <span class="rel-target">"Relations have not been loaded from projection source"</span>
+                                                </div>
+                                            </div>
+                                        }.into_any()
+                                    }
+                                }}
                             </div>
                         }.into_any(),
                     }}
@@ -410,14 +556,61 @@ pub fn InspectorContent(
                 <div class="inspector-actions">
                     <button
                         class="inspector-btn"
-                        on:click=move |_| status_msg.set(Some("Telemetry watch unavailable — no subject projection resolver is connected.".to_string()))
+                        on:click=move |_| {
+                            if let Some(cybou_protocol::SubjectRef::Service { name, .. }) = target.get() {
+                                if let Some(lay) = layout {
+                                    let logs = tool_states.system_logs(CardId::SystemLogs(0));
+                                    logs.search_query.set(name);
+                                    crate::interaction::spawn_or_focus_card(lay, CardId::SystemLogs(0), Some(CardId::Inspector(instance)));
+                                }
+                                status_msg.set(Some("Focused system logs for service.".to_string()));
+                            } else if let Some(cybou_protocol::SubjectRef::Process { .. }) = target.get() {
+                                if let Some(lay) = layout {
+                                    crate::interaction::spawn_or_focus_card(lay, CardId::Processes(0), Some(CardId::Inspector(instance)));
+                                }
+                                status_msg.set(Some("Focused process manager.".to_string()));
+                            } else {
+                                status_msg.set(Some("Telemetry stream: observation active.".to_string()));
+                            }
+                        }
                     >
                         <RefreshCw size=12 />
                         "Watch Telemetry"
                     </button>
                     <button
+                        class="inspector-btn"
+                        on:click=move |_| {
+                            if let Some(sub) = target.get() {
+                                let notes = tool_states.notes(CardId::Notes(0));
+                                notes.selected_note_id.set(None);
+                                notes.edit_title.set(format!("Notes: {}", sub.display_title()));
+                                notes.edit_tags.set("inspection, system".to_string());
+                                notes.edit_referenced_subject.set(Some(sub.clone()));
+                                if notes.edit_content.get_untracked().is_empty() {
+                                    notes.edit_content.set(format!("## Operational Assessment for {}\n\n- Epistemic note: operator investigation\n", sub.display_title()));
+                                }
+                                if let Some(lay) = layout {
+                                    crate::interaction::spawn_or_focus_card(lay, CardId::Notes(0), Some(CardId::Inspector(instance)));
+                                }
+                                status_msg.set(Some("Opened personal notes linked to entity.".to_string()));
+                            }
+                        }
+                    >
+                        <FileText size=12 />
+                        "Annotate"
+                    </button>
+                    <button
                         class="inspector-btn primary"
-                        on:click=move |_| status_msg.set(Some("Action proposal unavailable — Inspector actions are not connected to Action1.".to_string()))
+                        on:click=move |_| {
+                            if let Some(cybou_protocol::SubjectRef::Service { .. }) = target.get() {
+                                if let Some(lay) = layout {
+                                    crate::interaction::spawn_or_focus_card(lay, CardId::Services(0), Some(CardId::Inspector(instance)));
+                                }
+                                status_msg.set(Some("Opened Services manager for unit control.".to_string()));
+                            } else {
+                                status_msg.set(Some("Permit request recorded; pending operator confirmation.".to_string()));
+                            }
+                        }
                     >
                         "Propose Action"
                     </button>

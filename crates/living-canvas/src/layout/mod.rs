@@ -447,6 +447,44 @@ mod tests {
     }
 
     #[test]
+    fn open_card_near_places_collision_free_and_brings_forward() {
+        let mut layout = DesktopLayout::default();
+        let source = CardId::Services(0);
+        layout.open_card(source, 100.0, 100.0);
+
+        let target = CardId::Inspector(0);
+        layout.open_card_near(target, Some(source), None);
+
+        assert!(layout.contains_card(target));
+        let inspector_geom = layout.geometry(target);
+        let services_geom = layout.geometry(source);
+
+        let target_rect = Rect::new(
+            inspector_geom.x,
+            inspector_geom.y,
+            inspector_geom.width,
+            inspector_geom.height,
+        );
+        let source_rect = Rect::new(
+            services_geom.x,
+            services_geom.y,
+            services_geom.width,
+            services_geom.height,
+        );
+        assert!(!target_rect.intersects(&source_rect));
+
+        // When collapsed, calling open_card_near uncollapses and brings forward
+        layout.set_collapsed(target, true);
+        assert!(layout.presentation(target).collapsed);
+
+        let initial_cards_count = layout.cards.len();
+        layout.open_card_near(target, Some(source), None);
+
+        assert!(!layout.presentation(target).collapsed);
+        assert_eq!(layout.cards.len(), initial_cards_count);
+    }
+
+    #[test]
     fn a_merged_deck_stands_where_the_target_stood_and_is_its_size() {
         // Dropping one card onto another used to replace both with a deck starting at a constant
         // 420x480 that only ever grew, so a merge could double the footprint of what a person had

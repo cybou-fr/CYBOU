@@ -79,6 +79,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
         });
     };
 
+    let layout = use_context::<RwSignal<crate::DesktopLayout>>();
     let inspect_service = move |name: String| {
         let inspector_signals = tool_states.inspector(CardId::Inspector(0));
         inspector_signals
@@ -87,6 +88,17 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                 name,
                 node_id: None,
             }));
+        if let Some(lay) = layout {
+            crate::interaction::spawn_or_focus_card(lay, CardId::Inspector(0), Some(card));
+        }
+    };
+
+    let view_logs = move |name: String| {
+        let logs_signals = tool_states.system_logs(CardId::SystemLogs(0));
+        logs_signals.search_query.set(name);
+        if let Some(lay) = layout {
+            crate::interaction::spawn_or_focus_card(lay, CardId::SystemLogs(0), Some(card));
+        }
     };
 
     // Trigger initial load
@@ -236,6 +248,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                         let name_restart = svc.name.clone();
                         let name_stop = svc.name.clone();
                         let name_inspect = svc.name.clone();
+                        let name_logs = svc.name.clone();
                         let is_active = svc.state == ServiceState::Active;
 
                         let (badge_bg, badge_color) = match svc.state {
@@ -298,6 +311,13 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
                                             </button>
                                         }.into_any()
                                     }}
+                                    <button
+                                        style="background: var(--fill-subtle); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 3px 6px; font-size: 10px; color: var(--text-second); cursor: pointer;"
+                                        title="View service logs"
+                                        on:click=move |_| view_logs(name_logs.clone())
+                                    >
+                                        "Logs"
+                                    </button>
                                     <button
                                         style="background: var(--accent-fill); border: 1px solid var(--accent-line); border-radius: 4px; padding: 3px 6px; font-size: 10px; color: var(--accent-light); cursor: pointer; display: flex; align-items: center; gap: 4px;"
                                         title="Inspect in Universal Inspector"

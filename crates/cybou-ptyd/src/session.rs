@@ -25,6 +25,28 @@ const OUTPUT_CHUNK_BYTES: usize = 8 * 1024;
 /// unbounded wait, because a session must not be held open by a child that will not be collected.
 const REAP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 
+/// Resolve a host directory as this owner. This is a real per-account shell, so normal
+/// accessible symlinks are allowed; no sandbox or different account is inferred from a path.
+fn resolve_directory(directory: &str) -> Result<std::path::PathBuf, Refusal> {
+    let path = std::path::Path::new(directory);
+    if directory.len() > 4096
+        || directory.contains('\0')
+        || !path.is_absolute()
+        || path
+            .components()
+            .any(|part| matches!(part, std::path::Component::ParentDir))
+    {
+        return Err(Refusal::DirectoryUnavailable);
+    }
+    let resolved = path
+        .canonicalize()
+        .map_err(|_| Refusal::DirectoryUnavailable)?;
+    if !resolved.is_dir() {
+        return Err(Refusal::DirectoryUnavailable);
+    }
+    Ok(resolved)
+}
+
 /// Read one length-prefixed frame, or say why there will not be one.
 ///
 /// The length is read before the body and checked before anything is allocated for it. A peer that
@@ -85,8 +107,13 @@ where
     // The first frame opens the session and nothing else may. A connection that started sending
     // input before saying how large the screen is would be a program drawing into a size nobody
     // established, and a default eighty by twenty-four would be a guess a person then looks at.
-    let (columns, rows) = match first {
-        Ok(Some(FromGateway::Open { columns, rows })) => (columns, rows),
+    let (columns, rows, directory) = match first {
+        Ok(Some(FromGateway::Open { columns, rows })) => (columns, rows, None),
+        Ok(Some(FromGateway::OpenAt {
+            columns,
+            rows,
+            directory,
+        })) => (columns, rows, Some(directory)),
         Ok(None) => return Ok(None),
         Ok(Some(_)) => {
             write_frame(to_gateway, &FromOwner::Refused(Refusal::OutOfOrder)).await?;
@@ -102,6 +129,14 @@ where
         return Ok(None);
     }
 
+    let directory = match directory.as_deref().map(resolve_directory).transpose() {
+        Ok(directory) => directory,
+        Err(refusal) => {
+            write_frame(to_gateway, &FromOwner::Refused(refusal)).await?;
+            return Ok(None);
+        }
+    };
+
     let Ok((pty, pts)) = pty_process::open() else {
         write_frame(to_gateway, &FromOwner::Refused(Refusal::CouldNotStart)).await?;
         return Ok(None);
@@ -113,7 +148,13 @@ where
 
     // A login shell, because a person opening a terminal expects their profile to have run. This
     // is the account's own shell and the account's own profile; nothing here chooses either.
-    let Ok(child) = pty_process::Command::new(shell).arg("-l").spawn(pts) else {
+    let mut command = pty_process::Command::new(shell).arg("-l");
+    if let Some(directory) = directory {
+        // Child-local chdir, never a process-wide change and never shell input.
+        // The kernel checks search permission as the authenticated account at spawn time.
+        command = command.current_dir(directory);
+    }
+    let Ok(child) = command.spawn(pts) else {
         write_frame(to_gateway, &FromOwner::Refused(Refusal::CouldNotStart)).await?;
         return Ok(None);
     };
@@ -186,7 +227,7 @@ pub async fn run(
                     }
                     // A second Open is either a confused peer or an attempt to get a second shell
                     // out of one connection. Neither is a thing to answer.
-                    Ok(Some(FromGateway::Open { .. })) => break Some(Refusal::OutOfOrder),
+                    Ok(Some(FromGateway::Open { .. } | FromGateway::OpenAt { .. })) => break Some(Refusal::OutOfOrder),
                     Ok(None) => break None,
                     Err(refusal) => break Some(refusal),
                 }

@@ -99,6 +99,7 @@ pub fn FileManagerContent(
     let state = expect_context::<ToolCardStates>().file_manager(CardId::FileManager(instance));
     let active_category = state.active_category;
     let current_path = state.current_path;
+    let listed_host_directory = state.listed_host_directory;
     let entries = state.entries;
     let selected_file = state.selected_file;
     let file_content = state.file_content;
@@ -138,6 +139,7 @@ pub fn FileManagerContent(
         directory_request_generation
             .update(|generation| *generation = generation.saturating_add(1));
         let generation = directory_request_generation.get_untracked();
+        listed_host_directory.set(None);
         file_request_generation.update(|generation| *generation = generation.saturating_add(1));
         loading.set(true);
         error_msg.set(None);
@@ -156,6 +158,9 @@ pub fn FileManagerContent(
                             return;
                         }
                         loading.set(false);
+                        if let LocationRef::HostUserPath(path) = &listing.location {
+                            listed_host_directory.set(Some(path.clone()));
+                        }
                         was_read.set(true);
                         if listing.truncated {
                             error_msg.set(Some(format!(
@@ -674,15 +679,45 @@ pub fn FileManagerContent(
         }
     };
 
-    // Helper to give to Agent
-    let give_to_agent = move |filename: String| {
+    let desktop = use_context::<RwSignal<DesktopLayout>>();
+    let selection = use_context::<WriteSignal<Option<DesktopItemId>>>();
+    let camera = use_context::<crate::components::camera_context::CanvasCamera>();
+    let tools = expect_context::<ToolCardStates>();
+    let open_terminal_here = move || {
+        if is_public_preview()
+            || active_category.get_untracked() != LocationCategory::Home
+            || loading.get_untracked()
+        {
+            return;
+        }
+        let (Some(directory), Some(layout)) = (listed_host_directory.get_untracked(), desktop)
+        else {
+            return;
+        };
+        let view = crate::interaction::visible_canvas_rect(
+            camera.map_or((0.0, 0.0), |c| c.pan.get_untracked()),
+            camera.map_or(1.0, |c| c.zoom.get_untracked()),
+        );
+        let mut opened = None;
+        layout.update(|l| opened = tools.open_terminal_at(l, directory.clone(), view));
+        if let Some(card) = opened {
+            if let Some(selection) = selection {
+                selection.set(Some(DesktopItemId::Card(card)));
+            }
+            layout.get_untracked().save();
+            action_message.set(Some(format!("Opening a terminal in {directory}")));
+        }
+    };
+
+    // Navigation only: no file context is submitted to an agent by this action.
+    let open_agents = move || {
         if let Some(l) = use_context::<RwSignal<DesktopLayout>>() {
             l.update(|layout| layout.open_card(CardId::Agents, 460.0, 200.0));
             l.get_untracked().save();
         }
-        action_message.set(Some(format!(
-            "File {filename} attached to Agent workspace context"
-        )));
+        action_message.set(Some(
+            "Agents panel opened. No file has been attached.".to_string(),
+        ));
     };
 
     view! {
@@ -777,6 +812,13 @@ pub fn FileManagerContent(
                                 }}
                             </div>
                             <div class="fm-nav-actions">
+                                <Show when=move || active_category.get() == LocationCategory::Home>
+                                    <button class="fm-btn" title="Open a new terminal in this folder"
+                                        disabled=move || loading.get() || listed_host_directory.get().is_none()
+                                        on:click=move |_| open_terminal_here()>
+                                        "Terminal here"
+                                    </button>
+                                </Show>
                                 <button class="fm-btn" title="Up one level" on:click=move |_| go_up()>
                                     <IconArrowLeft size=12 />
                                     <span>"Up"</span>
@@ -1205,14 +1247,13 @@ pub fn FileManagerContent(
                                             </button>
                                             <button
                                                 class="fm-btn"
-                                                title="Give to Agent"
+                                                title="Open Agents panel"
                                                 on:click=move |_| {
-                                                    let filename = selected_file.get().unwrap_or_default();
-                                                    give_to_agent(filename);
+                                                    open_agents();
                                                 }
                                             >
                                                 <IconBot size=12 />
-                                                <span>"Agent"</span>
+                                                <span>"Agents"</span>
                                             </button>
                                             <button
                                                 class="fm-btn"

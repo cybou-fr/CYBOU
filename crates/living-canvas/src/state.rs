@@ -402,6 +402,196 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
         };
     }
 
+    // Services / Systemd / Units / Failures
+    if q.contains("service")
+        || q.contains("systemd")
+        || q.contains("daemon")
+        || q.contains("unit")
+        || q.contains("failed")
+        || q.contains("служб")
+        || q.contains("сервис")
+        || q.contains("демон")
+        || q.contains("юнит")
+        || q.contains("сбои")
+        || q.contains("упал")
+    {
+        return match state {
+            RuntimeState::Ready {
+                insight: Some(insight),
+                ..
+            } => {
+                let service_findings: Vec<_> = insight
+                    .findings
+                    .iter()
+                    .filter(|f| {
+                        f.finding.to_lowercase().contains("service")
+                            || f.about.as_ref().is_some_and(|a| a.contains("service"))
+                            || f.readings.iter().any(|r| r.subject.starts_with("service:"))
+                    })
+                    .collect();
+
+                if !service_findings.is_empty() {
+                    let first = service_findings[0];
+                    let name = first.about.as_deref().unwrap_or(first.finding.as_str());
+                    Some(AskCybouAnswer {
+                        headline: format!("{} service issue(s) detected", service_findings.len()),
+                        detail: format!(
+                            "{name}: {}. Inspection and self-healing policies are available.",
+                            first.means
+                        ),
+                        target: Some(("Open Services", crate::CardId::Services(0))),
+                    })
+                } else {
+                    Some(AskCybouAnswer {
+                        headline: "All system services operational".to_string(),
+                        detail: format!(
+                            "No degraded or failed systemd units detected across {} monitored subsystems.",
+                            insight.watched.len()
+                        ),
+                        target: Some(("Open Services", crate::CardId::Services(0))),
+                    })
+                }
+            }
+            RuntimeState::Ready { insight: None, .. } => Some(AskCybouAnswer {
+                headline: "Service telemetry unavailable".to_string(),
+                detail: "Telemetry organ could not provide service health projection.".to_string(),
+                target: Some(("Open Services", crate::CardId::Services(0))),
+            }),
+            _ => None,
+        };
+    }
+
+    // Memory / RAM / Swap
+    if q.contains("memory")
+        || q.contains("ram")
+        || q.contains("swap")
+        || q.contains("памят")
+        || q.contains("озу")
+        || q.contains("своп")
+    {
+        return match state {
+            RuntimeState::Ready {
+                insight: Some(insight),
+                ..
+            } => {
+                let mem_finding = insight.findings.iter().find(|f| {
+                    f.finding.to_lowercase().contains("mem")
+                        || f.readings.iter().any(|r| r.subject.contains("mem") || r.subject.contains("ram"))
+                });
+
+                if let Some(f) = mem_finding {
+                    Some(AskCybouAnswer {
+                        headline: "Memory pressure alert".to_string(),
+                        detail: format!("{}. CYBOU remediation monitoring active.", f.means),
+                        target: Some(("Open System Monitor", crate::CardId::Monitor(0))),
+                    })
+                } else {
+                    Some(AskCybouAnswer {
+                        headline: "Memory consumption normal".to_string(),
+                        detail: "Host memory and swap utilization are well within baseline telemetry limits.".to_string(),
+                        target: Some(("Open System Monitor", crate::CardId::Monitor(0))),
+                    })
+                }
+            }
+            _ => Some(AskCybouAnswer {
+                headline: "Memory monitor".to_string(),
+                detail: "Check current RAM and swap usage across processes and system caches.".to_string(),
+                target: Some(("Open System Monitor", crate::CardId::Monitor(0))),
+            }),
+        };
+    }
+
+    // CPU / Load / Processor
+    if q.contains("cpu")
+        || q.contains("processor")
+        || q.contains("load")
+        || q.contains("процессор")
+        || q.contains("нагрузк")
+        || q.contains("цпу")
+    {
+        return match state {
+            RuntimeState::Ready {
+                insight: Some(insight),
+                ..
+            } => {
+                let cpu_finding = insight.findings.iter().find(|f| {
+                    f.finding.to_lowercase().contains("cpu")
+                        || f.readings.iter().any(|r| r.subject.contains("cpu") || r.subject.contains("load"))
+                });
+
+                if let Some(f) = cpu_finding {
+                    Some(AskCybouAnswer {
+                        headline: "CPU load elevated".to_string(),
+                        detail: format!("{}. Check top consumers in Process Manager.", f.means),
+                        target: Some(("Open Process Manager", crate::CardId::Processes(0))),
+                    })
+                } else {
+                    Some(AskCybouAnswer {
+                        headline: "CPU load ordinary".to_string(),
+                        detail: "Host CPU utilization and scheduler load average are within ordinary baseline bounds.".to_string(),
+                        target: Some(("Open System Monitor", crate::CardId::Monitor(0))),
+                    })
+                }
+            }
+            _ => Some(AskCybouAnswer {
+                headline: "System load".to_string(),
+                detail: "View live CPU core utilization and process scheduler metrics.".to_string(),
+                target: Some(("Open System Monitor", crate::CardId::Monitor(0))),
+            }),
+        };
+    }
+
+    // Journal / Integrity / Audit / Logs
+    if q.contains("journal")
+        || q.contains("integrity")
+        || q.contains("audit")
+        || q.contains("log")
+        || q.contains("журнал")
+        || q.contains("целостност")
+        || q.contains("аудит")
+        || q.contains("лог")
+    {
+        return match state {
+            RuntimeState::Ready {
+                mind: Some(mind), ..
+            } => {
+                let integrity = mind.journal.integrity.as_deref().unwrap_or("unverified");
+                let count = mind.journal.contribution_count.unwrap_or(0);
+                Some(AskCybouAnswer {
+                    headline: format!("Journal chain: {integrity}"),
+                    detail: format!(
+                        "Canonical event log records {count} cryptographically sealed contribution(s). Epoch: {}.",
+                        mind.journal.erasure_epoch.unwrap_or(0)
+                    ),
+                    target: Some(("Open Journal Feed", crate::CardId::JournalFeed(0))),
+                })
+            }
+            _ => Some(AskCybouAnswer {
+                headline: "System logs & audit".to_string(),
+                detail: "Inspect journald system event streams and tamper-evident audit trail.".to_string(),
+                target: Some(("Open System Logs", crate::CardId::SystemLogs(0))),
+            }),
+        };
+    }
+
+    // Storage / Disks / Backups
+    if q.contains("storage")
+        || q.contains("disk")
+        || q.contains("backup")
+        || q.contains("zfs")
+        || q.contains("btrfs")
+        || q.contains("диск")
+        || q.contains("хранилищ")
+        || q.contains("бэкап")
+        || q.contains("резервн")
+    {
+        return Some(AskCybouAnswer {
+            headline: "Storage & Volume status".to_string(),
+            detail: "Inspect mounted filesystems, disk usage allocations, and snapshots.".to_string(),
+            target: Some(("Open Storage Manager", crate::CardId::Storage(0))),
+        });
+    }
+
     // Reach / Security / Boundary
     if q.contains("reach")
         || q.contains("network")
@@ -418,4 +608,31 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ask_cybou_multilingual_queries() {
+        let state = RuntimeState::Loading;
+        // Storage query doesn't require ready state
+        let ans_en = ask_cybou("check storage and disk", &state);
+        assert!(ans_en.is_some());
+        assert_eq!(
+            ans_en.as_ref().unwrap().target,
+            Some(("Open Storage Manager", crate::CardId::Storage(0)))
+        );
+
+        let ans_ru = ask_cybou("что с диском и хранилищем?", &state);
+        assert!(ans_ru.is_some());
+        assert_eq!(
+            ans_ru.as_ref().unwrap().target,
+            Some(("Open Storage Manager", crate::CardId::Storage(0)))
+        );
+
+        let ans_sec = ask_cybou("границы изоляции", &state);
+        assert!(ans_sec.is_some());
+    }
 }

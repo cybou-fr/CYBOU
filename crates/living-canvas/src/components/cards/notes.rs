@@ -11,6 +11,7 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
     let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.notes(card);
+    let layout = use_context::<RwSignal<crate::DesktopLayout>>();
 
     let load_notes = move || {
         signals.loading.set(true);
@@ -50,6 +51,7 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
         }
 
         signals.loading.set(true);
+        let referenced_subject = signals.edit_referenced_subject.get();
         leptos::task::spawn_local(async move {
             if let Some(id) = signals.selected_note_id.get() {
                 let req = cybou_web_contracts::UpdateNoteRequest {
@@ -78,7 +80,7 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
                     content_markdown: content,
                     tags,
                     is_pinned,
-                    referenced_subject: None,
+                    referenced_subject,
                 };
                 match client.create_note(req).await {
                     Ok(note) => {
@@ -105,6 +107,7 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
         signals.edit_content.set(note.content_markdown);
         signals.edit_tags.set(note.tags.join(", "));
         signals.edit_pinned.set(note.is_pinned);
+        signals.edit_referenced_subject.set(note.referenced_subject);
     };
 
     let new_note = move || {
@@ -113,6 +116,7 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
         signals.edit_content.set(String::new());
         signals.edit_tags.set(String::new());
         signals.edit_pinned.set(false);
+        signals.edit_referenced_subject.set(None);
     };
 
     // Trigger initial load
@@ -170,8 +174,11 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
                                     {if n.is_pinned { "📌 " } else { "" }}
                                     {n.title}
                                 </div>
-                                <div style="font-size: 9px; color: var(--text-faint); margin-top: 2px;">
-                                    {n.updated_at}
+                                <div style="font-size: 9px; color: var(--text-faint); margin-top: 2px; display: flex; justify-content: space-between;">
+                                    <span>{n.updated_at}</span>
+                                    {n.referenced_subject.as_ref().map(|s| view! {
+                                        <span style="color: var(--accent); font-size: 8px;">{s.kind_name()}</span>
+                                    })}
                                 </div>
                             </div>
                         }
@@ -197,6 +204,35 @@ pub fn NotesContent(card: CardId) -> impl IntoView {
                             "Pinned"
                         </label>
                     </div>
+
+                    <Show when=move || signals.edit_referenced_subject.get().is_some()>
+                        <div style="display: flex; align-items: center; gap: 6px; font-size: 11px;">
+                            <span style="color: var(--muted); font-size: 10px;">"Linked Entity:"</span>
+                            <button
+                                class="note-subject-pill"
+                                title="Inspect referenced entity"
+                                on:click=move |_| {
+                                    if let Some(sub) = signals.edit_referenced_subject.get() {
+                                        let inspector_signals = tool_states.inspector(CardId::Inspector(0));
+                                        inspector_signals.target_subject.set(Some(sub));
+                                        if let Some(lay) = layout {
+                                            crate::interaction::spawn_or_focus_card(lay, CardId::Inspector(0), Some(card));
+                                        }
+                                    }
+                                }
+                            >
+                                <lucide_leptos::Layers size=10 />
+                                {move || signals.edit_referenced_subject.get().map(|s| s.display_title()).unwrap_or_default()}
+                            </button>
+                            <button
+                                style="background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 12px; line-height: 1;"
+                                title="Remove link"
+                                on:click=move |_| signals.edit_referenced_subject.set(None)
+                            >
+                                "×"
+                            </button>
+                        </div>
+                    </Show>
 
                     <input
                         type="text"

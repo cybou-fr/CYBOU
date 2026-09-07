@@ -47,6 +47,8 @@ const SHELL_BANNER: &str = "Bounded, read-only. Type 'help' to see what this she
 /// a type that could be moved between threads would be claiming otherwise.
 #[derive(Clone, Copy)]
 pub struct TerminalSignals {
+    /// Requested starting host directory, not a claim about the shell's current directory.
+    pub start_directory: RwSignal<Option<String>>,
     /// The screen, fed by the host and read by the view.
     pub screen: RwSignal<crate::terminal::TerminalScreen, LocalStorage>,
     /// Bumped whenever bytes arrive.
@@ -73,6 +75,7 @@ impl TerminalSignals {
     /// A terminal that has not connected.
     fn new() -> Self {
         Self {
+            start_directory: RwSignal::new(None),
             screen: RwSignal::new_local(crate::terminal::TerminalScreen::new(80, 24)),
             generation: RwSignal::new(0),
             socket: RwSignal::new_local(None),
@@ -138,6 +141,8 @@ pub enum FileSortMode {
 /// One File Manager card's reactive state signals.
 #[derive(Clone, Copy)]
 pub struct FileManagerSignals {
+    /// Host directory whose listing actually succeeded. Cleared before navigation.
+    pub listed_host_directory: RwSignal<Option<String>>,
     /// Active location category in sidebar.
     pub active_category: RwSignal<cybou_web_contracts::LocationCategory>,
     /// The directory being looked at.
@@ -196,6 +201,7 @@ impl FileManagerSignals {
     /// A File Manager that has read nothing.
     fn new() -> Self {
         Self {
+            listed_host_directory: RwSignal::new(None),
             active_category: RwSignal::new(cybou_web_contracts::LocationCategory::Home),
             current_path: RwSignal::new("/".to_owned()),
             entries: RwSignal::new(Vec::new()),
@@ -1041,6 +1047,8 @@ pub struct NotesSignals {
     pub edit_tags: RwSignal<String>,
     /// Active edit pin status.
     pub edit_pinned: RwSignal<bool>,
+    /// Active edit referenced system subject.
+    pub edit_referenced_subject: RwSignal<Option<cybou_protocol::SubjectRef>>,
     /// Background fetch in flight.
     pub loading: RwSignal<bool>,
     /// Status message or toast.
@@ -1056,6 +1064,7 @@ impl NotesSignals {
             edit_content: RwSignal::new(String::new()),
             edit_tags: RwSignal::new(String::new()),
             edit_pinned: RwSignal::new(false),
+            edit_referenced_subject: RwSignal::new(None),
             loading: RwSignal::new(false),
             status_msg: RwSignal::new(None),
         }
@@ -1348,6 +1357,28 @@ impl ToolCardStates {
             held.insert(card, created);
         });
         created
+    }
+
+    /// Prepare an independent terminal before the canvas can mount and connect it.
+    pub fn open_terminal_at(
+        &self,
+        layout: &mut crate::DesktopLayout,
+        directory: String,
+        view: crate::layout::model::Rect,
+    ) -> Option<CardId> {
+        let mut instance = 0_u32;
+        while layout.contains_card(CardId::Terminal(instance))
+            || self
+                .terminals
+                .with_value(|held| held.contains_key(&CardId::Terminal(instance)))
+        {
+            instance = instance.checked_add(1)?;
+        }
+        let card = CardId::Terminal(instance);
+        self.terminal(card).start_directory.set(Some(directory));
+        let spot = layout.free_spot_in(card.spec().default_size, view);
+        layout.open_card(card, spot.0, spot.1);
+        Some(card)
     }
 
     /// This File Manager card's state, creating it the first time the card is shown.

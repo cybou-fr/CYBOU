@@ -722,3 +722,50 @@ pub fn apply_redo(history: RwSignal<LayoutHistory>, layout: RwSignal<DesktopLayo
         layout.get_untracked().save();
     }
 }
+
+/// Open or focus a target card near an optional source card using collision-free placement,
+/// bringing it to front and updating selection.
+pub fn spawn_or_focus_card(
+    layout: RwSignal<DesktopLayout>,
+    target: CardId,
+    source: Option<CardId>,
+) {
+    layout.update(|l| {
+        l.open_card_near(target, source, Some(usable_viewport()));
+    });
+    layout.get_untracked().save();
+
+    if let Some(set_selected) = use_context::<WriteSignal<Option<DesktopItemId>>>() {
+        set_selected.set(Some(DesktopItemId::Card(target)));
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        if let Some(camera) = use_context::<crate::components::camera_context::CanvasCamera>() {
+            let geom = layout.get_untracked().geometry(target);
+            if !camera.shows(geom) {
+                let camera_history = use_context::<RwSignal<crate::layout::camera::CameraHistory>>();
+                let pan = use_context::<ReadSignal<(f64, f64)>>();
+                let set_pan = use_context::<WriteSignal<(f64, f64)>>();
+                let zoom = use_context::<ReadSignal<f64>>();
+                let set_zoom = use_context::<WriteSignal<f64>>();
+                if let (Some(pan), Some(set_pan), Some(zoom), Some(set_zoom)) = (pan, set_pan, zoom, set_zoom) {
+                    let center_x = geom.x + geom.width / 2.0;
+                    let center_y = geom.y + geom.height / 2.0;
+                    let target_zoom = zoom.get_untracked().clamp(0.7, 1.2);
+                    crate::layout::camera::apply_camera_fly_to(
+                        camera_history,
+                        pan,
+                        set_pan,
+                        zoom,
+                        set_zoom,
+                        center_x,
+                        center_y,
+                        target_zoom,
+                    );
+                }
+            }
+        }
+    }
+}
+

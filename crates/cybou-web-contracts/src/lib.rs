@@ -986,6 +986,8 @@ pub struct UserDraftListProjection {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DesktopLayoutProjection {
+    /// Opaque content revision; absent only when no arrangement exists.
+    pub revision: Option<String>,
     /// Contract schema version.
     pub schema_version: SchemaVersion,
     /// The arrangement this seat last saved, or `None` if it has never saved one. `None` is not an
@@ -999,6 +1001,8 @@ pub struct DesktopLayoutProjection {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DesktopLayoutSaveRequest {
+    /// Revision read before editing. Absence permits creation only.
+    pub expected_revision: Option<String>,
     /// The arrangement, as the browser wrote it.
     pub layout: String,
 }

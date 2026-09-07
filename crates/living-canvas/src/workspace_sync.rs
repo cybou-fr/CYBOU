@@ -1,124 +1,281 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! Following one person's desktop from whatever screen they are sitting at.
-//!
-//! The arrangement was kept in `localStorage` and nowhere else, which is per browser, per profile
-//! and per machine. Signing in from a second computer produced a stranger's desktop; clearing site
-//! data threw the arrangement away along with the cookies. For a desktop whose argument is that it
-//! is the same desktop wherever you reach it, that was the wrong place to keep it.
-//!
-//! `localStorage` stays, because it is the only copy that is there before the first request comes
-//! back and the only one left when the gateway is unreachable. What changes is that it is no longer
-//! the only copy: what a seat saves is sent to the gateway, and what the gateway has is adopted at
-//! startup.
-//!
-//! The gateway wins at startup, deliberately. Two copies eventually disagree, and the one the
-//! account carries is the one a person means when they open the desktop somewhere new. The local
-//! copy is a cache in front of it, not a peer.
+//! Conditional synchronization: late reads and other tabs never discard local work.
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Phase {
+    Loading,
+    Ready,
+    Conflict,
+    LocalOnly,
+    Invalid,
+}
+
+#[derive(Clone, Debug)]
+pub struct WorkspaceSync {
+    pub phase: Phase,
+    pub revision: Option<String>,
+    pub remote: Option<String>,
+    baseline: String,
+    pub busy: bool,
+    pub offline: bool,
+    conflict_read: bool,
+}
+impl WorkspaceSync {
+    pub fn new(local: String) -> Self {
+        Self {
+            phase: Phase::Loading,
+            revision: None,
+            remote: None,
+            baseline: local,
+            busy: false,
+            offline: false,
+            conflict_read: false,
+        }
+    }
+    pub fn loaded(
+        &mut self,
+        local: &str,
+        remote: Option<String>,
+        revision: Option<String>,
+    ) -> Option<String> {
+        self.busy = false;
+        self.offline = false;
+        self.revision = revision;
+        self.remote.clone_from(&remote);
+        if self.conflict_read
+            || (local != self.baseline && remote.as_deref().is_some_and(|r| r != local))
+        {
+            self.phase = Phase::Conflict;
+            return None;
+        }
+        self.phase = Phase::Ready;
+        self.baseline = remote.clone().unwrap_or_default();
+        remote
+    }
+    pub fn needs_save(&self, local: &str) -> bool {
+        self.phase == Phase::Ready && !self.busy && local != self.baseline
+    }
+    pub fn has_pending_changes(&self, local: &str) -> bool {
+        self.phase != Phase::LocalOnly && (self.phase == Phase::Conflict || local != self.baseline)
+    }
+    pub fn saved(&mut self, sent: String, revision: Option<String>) {
+        self.baseline = sent;
+        self.revision = revision;
+        self.busy = false;
+        self.offline = false;
+    }
+    pub fn rejected(&mut self) {
+        self.phase = Phase::Loading;
+        self.conflict_read = true;
+        self.busy = false;
+    }
+    pub fn keep_local(&mut self) {
+        self.baseline = self.remote.clone().unwrap_or_default();
+        self.phase = Phase::Ready;
+        self.conflict_read = false;
+    }
+}
 
 #[cfg(target_arch = "wasm32")]
-pub use browser::provide_workspace_sync;
+pub use browser::{WorkspaceSyncStatus, provide_workspace_sync};
 
 #[cfg(target_arch = "wasm32")]
 mod browser {
+    use super::{Phase, WorkspaceSync};
+    use crate::DesktopLayout;
     use gloo_net::http::Request;
     use leptos::prelude::*;
 
-    use crate::DesktopLayout;
-
-    /// How often a changed desktop is sent, in milliseconds.
-    ///
-    /// Two seconds. A drag emits a position on every frame and each of them is a change; sending
-    /// them would be a request per frame for something nobody reads until the next sign-in. What
-    /// matters is that the arrangement is durable shortly after a person stops moving things, not
-    /// that every intermediate position was recorded.
-    const SYNC_INTERVAL_MS: u32 = 2_000;
-
-    /// Adopt the account's saved desktop, then keep sending this one back to it.
-    ///
-    /// Called once, by the app root, with the layout signal the whole desktop reads and writes.
-    pub fn provide_workspace_sync(layout: RwSignal<DesktopLayout>) {
-        // Set while this module is the one writing to `layout`, so adopting the server's copy is
-        // not mistaken for a person rearranging their desktop and sent straight back.
-        let adopting = StoredValue::new_local(false);
-        let dirty = RwSignal::new(false);
-        // Turned off for good on the first refusal. A desktop with no seat — a public preview —
-        // has nowhere to save an arrangement to, and retrying every two seconds forever would be
-        // this page asking a question it has already been answered.
-        let syncing = RwSignal::new(true);
-
+    fn serialize(layout: RwSignal<DesktopLayout>) -> String {
+        serde_json::to_string(&layout.get_untracked()).expect("normalized layout")
+    }
+    fn sync(layout: RwSignal<DesktopLayout>, state: RwSignal<WorkspaceSync>) {
+        let current = serialize(layout);
+        let snapshot = state.get_untracked();
+        if snapshot.busy {
+            return;
+        }
+        let loading = snapshot.phase == Phase::Loading;
+        if !loading && !snapshot.needs_save(&current) {
+            return;
+        }
+        state.update(|s| s.busy = true);
         leptos::task::spawn_local(async move {
-            let Ok(response) = Request::get("/api/v1/desktop/layout").send().await else {
-                return;
-            };
-            if !response.ok() {
-                // 403 is the ordinary answer for a reader with no seat, and it is not a failure of
-                // anything: it means this desktop is local to this browser and always was.
-                syncing.set(false);
-                return;
-            }
-            let Ok(projection) = response
-                .json::<cybou_web_contracts::DesktopLayoutProjection>()
-                .await
-            else {
-                return;
-            };
-            // No saved arrangement is not an empty desktop. A seat that has never saved keeps
-            // whatever this browser already had, which is how a first sign-in on a machine somebody
-            // has been using anonymously does not wipe their desktop.
-            let Some(saved) = projection.layout else {
-                return;
-            };
-            let Ok(mut restored) = serde_json::from_str::<DesktopLayout>(&saved) else {
-                return;
-            };
-            restored.validate_and_normalize();
-            adopting.set_value(true);
-            layout.set(restored);
-            // Written through to the local copy as well, so a reload with the gateway down opens
-            // what the account last had rather than what this browser last had.
-            layout.get_untracked().save();
-            adopting.set_value(false);
-        });
-
-        // Anything that changes the desktop changes this signal, so this is the one place that has
-        // to know a change happened — rather than every call site that makes one remembering to say
-        // so, which is the arrangement that let the local copy be the only copy for so long.
-        Effect::new(move |_| {
-            layout.track();
-            if !adopting.get_value() {
-                dirty.set(true);
-            }
-        });
-
-        let interval = gloo_timers::callback::Interval::new(SYNC_INTERVAL_MS, move || {
-            if !syncing.get_untracked() || !dirty.get_untracked() {
-                return;
-            }
-            let Ok(body) = serde_json::to_string(&layout.get_untracked()) else {
-                return;
-            };
-            // Cleared before the request rather than after it. A change made while this one is in
-            // flight must survive: clearing on success would drop it, and the next tick would find
-            // nothing to send.
-            dirty.set(false);
-            leptos::task::spawn_local(async move {
-                let sent = Request::put("/api/v1/desktop/layout")
-                    .json(&cybou_web_contracts::DesktopLayoutSaveRequest { layout: body });
-                let Ok(request) = sent else {
-                    return;
-                };
-                match request.send().await {
-                    Ok(response) if response.ok() => {}
-                    // A refusal means there is nowhere to save to; anything else is this gateway
-                    // being unreachable for a moment, and the next change will try again.
-                    Ok(response) if response.status() == 403 => syncing.set(false),
-                    _ => dirty.set(true),
+            let response = if loading {
+                Request::get("/api/v1/desktop/layout").send().await
+            } else {
+                match Request::put("/api/v1/desktop/layout").json(
+                    &cybou_web_contracts::DesktopLayoutSaveRequest {
+                        layout: current.clone(),
+                        expected_revision: snapshot.revision,
+                    },
+                ) {
+                    Ok(request) => request.send().await,
+                    Err(error) => Err(error),
                 }
-            });
+            };
+            if state.is_disposed() {
+                return;
+            }
+            match response {
+                Ok(response) if response.ok() => {
+                    let projection = response
+                        .json::<cybou_web_contracts::DesktopLayoutProjection>()
+                        .await;
+                    if state.is_disposed() {
+                        return;
+                    }
+                    let Ok(projection) = projection else {
+                        state.update(|s| {
+                            s.busy = false;
+                            s.phase = Phase::Invalid;
+                        });
+                        return;
+                    };
+                    if loading {
+                        let restored = projection
+                            .layout
+                            .as_deref()
+                            .map(serde_json::from_str::<DesktopLayout>)
+                            .transpose();
+                        let Ok(restored) = restored else {
+                            state.update(|s| {
+                                s.busy = false;
+                                s.phase = Phase::Invalid;
+                            });
+                            return;
+                        };
+                        let remote = restored.map(|mut value| {
+                            value.validate_and_normalize();
+                            serde_json::to_string(&value).expect("normalized layout")
+                        });
+                        let local = serialize(layout);
+                        let mut adopt = None;
+                        state.update(|s| adopt = s.loaded(&local, remote, projection.revision));
+                        if let Some(saved) = adopt {
+                            layout.set(serde_json::from_str(&saved).expect("validated layout"));
+                            layout.get_untracked().save();
+                        }
+                    } else {
+                        state.update(|s| s.saved(current, projection.revision));
+                    }
+                }
+                Ok(response) if response.status() == 409 => state.update(WorkspaceSync::rejected),
+                Ok(response) if matches!(response.status(), 401 | 403) => state.update(|s| {
+                    s.busy = false;
+                    s.phase = Phase::LocalOnly;
+                }),
+                Ok(response) if response.status() < 500 => state.update(|s| {
+                    s.busy = false;
+                    s.phase = Phase::Invalid;
+                }),
+                _ => state.update(|s| {
+                    s.busy = false;
+                    s.offline = true;
+                }),
+            }
         });
+    }
+
+    pub fn provide_workspace_sync(layout: RwSignal<DesktopLayout>) {
+        let state = RwSignal::new(WorkspaceSync::new(serialize(layout)));
+        provide_context(state);
+        sync(layout, state);
+        let interval = gloo_timers::callback::Interval::new(2_000, move || sync(layout, state));
         let held = StoredValue::new_local(Some(interval));
         on_cleanup(move || held.update_value(|slot| drop(slot.take())));
+    }
+
+    #[component]
+    pub fn WorkspaceSyncStatus() -> impl IntoView {
+        let state = use_context::<RwSignal<WorkspaceSync>>();
+        let layout = use_context::<RwSignal<DesktopLayout>>();
+        match (state, layout) {
+            (Some(state), Some(layout)) => view! {
+                <div class="workspace-sync" class:conflict=move || state.get().phase == Phase::Conflict>
+                <span role="status" aria-live="polite">{move || {
+                    let s = state.get();
+                    if s.offline { return "Layout offline — retrying"; }
+                    match s.phase {
+                        Phase::Loading => "Loading layout…",
+                        Phase::Conflict => "Layout changed elsewhere. Choose which to keep.",
+                        Phase::LocalOnly => "Layout on this browser only",
+                        Phase::Invalid => "Layout sync unavailable — local layout kept",
+                        Phase::Ready => if s.busy { "Saving layout…" }
+                            else if s.needs_save(&serde_json::to_string(&layout.get()).unwrap_or_default()) {
+                                "Layout not saved yet"
+                            } else { "Layout saved" },
+                    }
+                }}</span>
+                <Show when=move || state.get().phase == Phase::Conflict>
+                    <button class="history-btn" on:click=move |_| state.update(WorkspaceSync::keep_local)>
+                        "Keep this layout"
+                    </button>
+                    <button class="history-btn" disabled=move || state.get().remote.is_none() on:click=move |_| {
+                        if let Some(saved) = state.get_untracked().remote
+                            && let Ok(restored) = serde_json::from_str::<DesktopLayout>(&saved) {
+                                layout.set(restored);
+                                layout.get_untracked().save();
+                                state.update(|s| { s.keep_local(); s.baseline = saved; });
+                        }
+                    }>"Use saved layout"</button>
+                </Show>
+                </div>
+            }.into_any(),
+            _ => ().into_any(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn a_late_read_preserves_local_edits() {
+        let mut s = WorkspaceSync::new("initial".into());
+        assert!(!s.needs_save("edited"));
+        assert_eq!(
+            s.loaded("edited", Some("remote".into()), Some("r1".into())),
+            None
+        );
+        assert_eq!(s.phase, Phase::Conflict);
+        assert!(!s.needs_save("edited"));
+        s.keep_local();
+        assert!(s.needs_save("edited"));
+        assert_eq!(s.revision.as_deref(), Some("r1"));
+    }
+    #[test]
+    fn edits_during_a_save_remain_pending() {
+        let mut s = WorkspaceSync::new("initial".into());
+        s.loaded("initial", None, None);
+        s.busy = true;
+        assert!(!s.needs_save("second"));
+        s.saved("first".into(), Some("r1".into()));
+        assert!(s.needs_save("second"));
+        assert!(!s.needs_save("first"));
+    }
+    #[test]
+    fn a_conflict_refresh_never_silently_adopts_the_other_tab() {
+        let mut s = WorkspaceSync::new("initial".into());
+        s.rejected();
+        assert_eq!(
+            s.loaded("initial", Some("other".into()), Some("r2".into())),
+            None
+        );
+        assert_eq!(s.phase, Phase::Conflict);
+    }
+    #[test]
+    fn initial_load_adopts_saved_and_new_accounts_save_local() {
+        let mut s = WorkspaceSync::new("initial".into());
+        assert_eq!(
+            s.loaded("initial", Some("saved".into()), Some("r1".into())),
+            Some("saved".into())
+        );
+        assert!(!s.needs_save("saved"));
+        let mut s = WorkspaceSync::new("initial".into());
+        assert_eq!(s.loaded("initial", None, None), None);
+        assert!(s.needs_save("initial"));
     }
 }

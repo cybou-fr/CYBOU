@@ -111,7 +111,7 @@ fn connect(signals: crate::tool_state::TerminalSignals) {
         let (columns, rows) = signals.window.get_untracked();
         send(
             &opened,
-            &cybou_web_contracts::TerminalFromGateway::Open { columns, rows },
+            &crate::terminal::opening_frame(columns, rows, signals.start_directory.get_untracked()),
         );
     });
     socket.set_onopen(Some(on_open.as_ref().unchecked_ref()));
@@ -292,6 +292,9 @@ pub fn TerminalContent(
         <div class="terminal-panel">
             <div class="terminal-bar">
                 <span class="terminal-status">{move || signals.status.get()}</span>
+                {move || signals.start_directory.get().map(|directory| view! {
+                    <span class="terminal-status" title="Requested starting folder; the shell can change directory">{format!("Start: {directory}")}</span>
+                })}
                 <button
                     class="terminal-btn"
                     disabled=move || signals.socket.get().is_some() || signals.status.get() == "Connecting…"

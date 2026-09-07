@@ -60,6 +60,16 @@ pub enum FromGateway {
         /// Terminal height in rows.
         rows: u16,
     },
+    /// Start in an explicit host directory. A separate variant prevents older owners from
+    /// silently ignoring the directory and opening somewhere else.
+    OpenAt {
+        /// Terminal width in columns.
+        columns: u16,
+        /// Terminal height in rows.
+        rows: u16,
+        /// Absolute host path, resolved and entered by the unprivileged owner.
+        directory: String,
+    },
     /// Keystrokes, on their way to the program.
     Input(Vec<u8>),
     /// The window changed size.
@@ -121,6 +131,8 @@ pub enum Refusal {
     Idle,
     /// The pseudoterminal could not be allocated, or the shell could not be started.
     CouldNotStart,
+    /// The requested working directory could not be used by this account.
+    DirectoryUnavailable,
 }
 
 impl Refusal {
@@ -137,6 +149,9 @@ impl Refusal {
             }
             Self::Idle => "the session was idle and was closed",
             Self::CouldNotStart => "no terminal could be started for this account",
+            Self::DirectoryUnavailable => {
+                "the requested folder is unavailable to this account; no terminal was started"
+            }
         }
     }
 }
@@ -186,6 +201,7 @@ mod tests {
             Refusal::OutputOutranTheReader,
             Refusal::Idle,
             Refusal::CouldNotStart,
+            Refusal::DirectoryUnavailable,
         ] {
             let explanation = refusal.explain();
             assert!(!explanation.is_empty());
@@ -207,6 +223,11 @@ mod tests {
     #[test]
     fn frames_survive_the_wire_they_are_carried_on() {
         for frame in [
+            FromGateway::OpenAt {
+                columns: 80,
+                rows: 24,
+                directory: "/home/alice/project space".into(),
+            },
             FromGateway::Open {
                 columns: 80,
                 rows: 24,

@@ -192,6 +192,66 @@ async fn carry(browser: WebSocket, owner: tokio::net::UnixStream) {
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn an_explicit_directory_reaches_the_owner_unchanged() {
+        use axum::{Router, routing::get};
+        use std::sync::{Arc, Mutex};
+        let (owner_socket, mut owner_probe) = tokio::net::UnixStream::pair().unwrap();
+        let slot = Arc::new(Mutex::new(Some(owner_socket)));
+        let app = Router::new().route(
+            "/",
+            get(move |upgrade: WebSocketUpgrade| {
+                let owner = slot.lock().unwrap().take().unwrap();
+                async move { upgrade.on_upgrade(move |browser| carry(browser, owner)) }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        let mut client = tokio::net::TcpStream::connect(address).await.unwrap();
+        client.write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n").await.unwrap();
+        let mut headers = Vec::new();
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while !headers.ends_with(b"\r\n\r\n") {
+                headers.push(client.read_u8().await.unwrap());
+            }
+        })
+        .await
+        .unwrap();
+        assert!(headers.starts_with(b"HTTP/1.1 101"));
+        let expected = cybou_protocol::terminal::FromGateway::OpenAt {
+            columns: 80,
+            rows: 24,
+            directory: "/home/alice/project space".into(),
+        };
+        let mut body = Vec::new();
+        ciborium::into_writer(&expected, &mut body).unwrap();
+        // A real masked binary WebSocket frame; the gateway must preserve its CBOR payload.
+        assert!(body.len() < 126);
+        let mask = [1_u8, 2, 3, 4];
+        let mut frame = vec![0x82, 0x80 | u8::try_from(body.len()).unwrap()];
+        frame.extend_from_slice(&mask);
+        frame.extend(body.iter().enumerate().map(|(i, byte)| byte ^ mask[i % 4]));
+        client.write_all(&frame).await.unwrap();
+        let received = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            let size = owner_probe.read_u32().await.unwrap();
+            let mut received = vec![0; size as usize];
+            owner_probe.read_exact(&mut received).await.unwrap();
+            received
+        })
+        .await
+        .unwrap();
+        assert_eq!(received, body);
+        let decoded: cybou_protocol::terminal::FromGateway =
+            ciborium::from_reader(received.as_slice()).unwrap();
+        assert_eq!(decoded, expected);
+        drop(client);
+        drop(owner_probe);
+        server.abort();
+    }
+
     #[test]
     fn the_gateway_bounds_a_frame_exactly_where_the_owner_does() {
         // Read from the protocol rather than restated, so the two cannot drift. A gateway that

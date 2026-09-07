@@ -518,3 +518,146 @@ async fn a_narrow_window_draws_every_card_wherever_the_layout_holds_it() {
         "a stacked card is drawn wherever the layout happens to hold it"
     );
 }
+
+#[wasm_bindgen_test]
+async fn layout_conflict_buttons_preserve_work_until_a_person_chooses() {
+    use crate::workspace_sync::{Phase, WorkspaceSync, WorkspaceSyncStatus};
+    let owner = Owner::new();
+    let initial = DesktopLayout::new();
+    let mut remote = initial.clone();
+    remote.open_card(CardId::Editor(0), 200.0, 100.0);
+    let remote_json = serde_json::to_string(&remote).unwrap();
+    let initial_json = serde_json::to_string(&initial).unwrap();
+    let (layout, state) = owner.with(|| {
+        let layout = RwSignal::new(initial.clone());
+        let mut sync = WorkspaceSync::new(initial_json.clone());
+        sync.rejected();
+        sync.loaded(
+            &initial_json,
+            Some(remote_json.clone()),
+            Some("remote-version".into()),
+        );
+        (layout, RwSignal::new(sync))
+    });
+    let host = stage();
+    let mounted = mount_to(host.clone(), move || {
+        provide_context(layout);
+        provide_context(state);
+        view! { <WorkspaceSyncStatus /> }
+    });
+    settled().await;
+    assert_eq!(layout.get_untracked(), initial);
+    assert!(
+        host.text_content()
+            .unwrap()
+            .contains("Layout changed elsewhere")
+    );
+    host.query_selector_all("button")
+        .unwrap()
+        .item(0)
+        .unwrap()
+        .dyn_into::<web_sys::HtmlElement>()
+        .unwrap()
+        .click();
+    settled().await;
+    assert_eq!(layout.get_untracked(), initial);
+    assert_eq!(state.get_untracked().phase, Phase::Ready);
+    assert!(state.get_untracked().needs_save(&initial_json));
+    state.update(|s| {
+        s.rejected();
+        s.loaded(
+            &initial_json,
+            Some(remote_json.clone()),
+            Some("remote-version".into()),
+        );
+    });
+    settled().await;
+    host.query_selector_all("button")
+        .unwrap()
+        .item(1)
+        .unwrap()
+        .dyn_into::<web_sys::HtmlElement>()
+        .unwrap()
+        .click();
+    settled().await;
+    assert_eq!(layout.get_untracked(), remote);
+    assert!(!state.get_untracked().needs_save(&remote_json));
+    assert!(host.text_content().unwrap().contains("Layout saved"));
+    drop(mounted);
+    host.remove();
+}
+
+#[wasm_bindgen_test]
+async fn files_open_independent_terminals_with_the_listed_host_directory() {
+    use crate::components::cards::FileManagerContent;
+    use cybou_web_contracts::LocationCategory;
+    let (_owner, states) = desk_owner();
+    let desk = Desk::new(DesktopLayout::new());
+    let files = states.file_manager(CardId::FileManager(0));
+    files.read.set(true);
+    files.current_path.set("/home/alice/project space".into());
+    files
+        .listed_host_directory
+        .set(Some("/home/alice/project space".into()));
+    let (layout, selection, runtime, auth) =
+        (desk.layout, desk.set_selected, desk.runtime, desk.auth);
+    let host = stage();
+    let mounted = mount_to(host.clone(), move || {
+        provide_context(states);
+        provide_context(layout);
+        provide_context(selection);
+        view! { <FileManagerContent runtime=runtime auth_modal_open=auth /> }
+    });
+    settled().await;
+    let button = || {
+        host.query_selector("button[title='Open a new terminal in this folder']")
+            .unwrap()
+            .unwrap()
+            .dyn_into::<web_sys::HtmlElement>()
+            .unwrap()
+    };
+    button().click();
+    settled().await;
+    let first = desk.selected.get_untracked().unwrap();
+    let DesktopItemId::Card(first) = first else {
+        panic!("expected a terminal card")
+    };
+    let original = states.terminal(first);
+    assert_eq!(
+        original.start_directory.get_untracked().as_deref(),
+        Some("/home/alice/project space")
+    );
+    let opening = crate::terminal::opening_frame(80, 24, original.start_directory.get_untracked());
+    assert!(
+        matches!(opening, cybou_web_contracts::TerminalFromGateway::OpenAt { directory, .. } if directory == "/home/alice/project space")
+    );
+    original.status.set("Existing session".into());
+    files
+        .listed_host_directory
+        .set(Some("/home/alice/second".into()));
+    files.current_path.set("/home/alice/second".into());
+    button().click();
+    settled().await;
+    assert_ne!(
+        desk.selected.get_untracked(),
+        Some(DesktopItemId::Card(first))
+    );
+    assert_eq!(original.status.get_untracked(), "Existing session");
+    assert_eq!(
+        original.start_directory.get_untracked().as_deref(),
+        Some("/home/alice/project space")
+    );
+    assert_eq!(layout.get_untracked().cards.len(), 2);
+    files.listed_host_directory.set(None);
+    settled().await;
+    assert!(button().has_attribute("disabled"));
+    files.active_category.set(LocationCategory::Sandbox);
+    settled().await;
+    assert!(
+        host.query_selector("button[title='Open a new terminal in this folder']")
+            .unwrap()
+            .is_none()
+    );
+    drop(mounted);
+    host.remove();
+}

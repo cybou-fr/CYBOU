@@ -13,6 +13,7 @@ use leptos::prelude::*;
 #[component]
 pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
     let client = crate::GatewayMindClient;
+    let layout = use_context::<RwSignal<crate::DesktopLayout>>();
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.cognitive_graph(card);
 
@@ -171,6 +172,7 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
                 {move || signals.selected_node_id.get().and_then(|sel_id| {
                     signals.graph.get().and_then(|g| {
                         g.graph.nodes.into_iter().find(|n| n.id == sel_id).map(|node| {
+                            let inspect_node = node.clone();
                             view! {
                                 <div style="width: 260px; border-left: 1px solid var(--line); padding: 12px; background: var(--bg-sunken); overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
                                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
@@ -185,6 +187,40 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
                                             "✕"
                                         </button>
                                     </div>
+                                    <button
+                                        style="background: var(--accent-fill); border: 1px solid var(--accent-line); border-radius: 4px; padding: 6px 10px; font-size: 11px; color: var(--accent-light); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600;"
+                                        title="Open Universal Inspector for this entity"
+                                        on:click={
+                                            let inspect_node = inspect_node.clone();
+                                            move |_| {
+                                                let inspector_signals = tool_states.inspector(CardId::Inspector(0));
+                                                inspector_signals.subject_query.set(None);
+                                                let category = inspect_node.node_type.category_name();
+                                                let subject = match category {
+                                                    "Service" => Some(cybou_protocol::SubjectRef::Service {
+                                                        name: inspect_node.label.clone(),
+                                                        node_id: None,
+                                                    }),
+                                                    "Agent" => Some(cybou_protocol::SubjectRef::Agent {
+                                                        capsule_id: inspect_node.id.clone(),
+                                                        agent_type: inspect_node.label.clone(),
+                                                    }),
+                                                    _ => None,
+                                                };
+                                                if let Some(subj) = subject {
+                                                    inspector_signals.target_subject.set(Some(subj));
+                                                } else {
+                                                    inspector_signals.subject_query.set(Some(cybou_protocol::SubjectQuery::Service(inspect_node.label.clone())));
+                                                }
+                                                if let Some(lay) = layout {
+                                                    crate::interaction::spawn_or_focus_card(lay, CardId::Inspector(0), Some(card));
+                                                }
+                                            }
+                                        }
+                                    >
+                                        <IconLayers size=12 />
+                                        <span>"Inspect Entity"</span>
+                                    </button>
                                     <div style="font-size: 11px; display: flex; flex-direction: column; gap: 4px;">
                                         <div style="color: var(--text-second);">"Category: " <b style="color: var(--text-bright);">{node.node_type.category_name()}</b></div>
                                         <div style="color: var(--text-second);">"Confidence: " <b style="color: var(--text-bright);">{format!("{:.1}%", node.confidence * 100.0)}</b></div>

@@ -140,6 +140,38 @@ impl DesktopLayout {
         });
     }
 
+    /// Open a target card near an optional source card using `PlacementResolver` to avoid collisions.
+    /// If the target card is already present, it is uncollapsed and brought forward.
+    pub fn open_card_near(
+        &mut self,
+        target: CardId,
+        source: Option<CardId>,
+        viewport: Option<crate::layout::model::UsableViewport>,
+    ) {
+        if self.contains_card(target) {
+            if self.presentation(target).collapsed {
+                self.set_collapsed(target, false);
+            }
+            self.bring_forward(target);
+            return;
+        }
+
+        let spec = target.spec();
+        let pref_rect = source.map(|s| {
+            let g = self.geometry(s);
+            Rect::new(g.x, g.y, g.width, g.height)
+        });
+        let vp = viewport.unwrap_or_default();
+        let (x, y) = crate::layout::PlacementResolver::find_placement(
+            &self.desktop_items(),
+            spec.default_size.0,
+            spec.default_size.1,
+            pref_rect,
+            vp,
+        );
+        self.open_card(target, x, y);
+    }
+
     /// Somewhere inside `view` that no open item covers, for a card of `size`.
     ///
     /// `view` is in canvas coordinates: what the window currently shows, which is the only part of
