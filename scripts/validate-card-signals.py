@@ -17,6 +17,11 @@ removing the fixes and watching it fail.
 
 A file that writes into another card's state is a different thing and is listed below with its
 reason, because the alternative is a check nobody can make green honestly.
+
+Handing the signal to a component that renders it counts as rendering it, and only that: the
+component is named here, so this cannot widen into "the name appears somewhere in the file", which
+is the failure mode an earlier version of this check already had. The component is then held to the
+live-region rule itself, so delegating cannot be a way around it.
 """
 
 import pathlib
@@ -36,6 +41,16 @@ WRITE = re.compile(
 READ = re.compile(
     rf"(?:(\w+)\s*\.\s*)?(\w*(?:{_SPOKEN_ALTERNATION}))\s*\.\s*get(?:_untracked)?\(\)"
 )
+
+# The kit component that draws a status line. A panel that hands its signal to this has rendered it
+# as surely as one that called `.get()` in its own view, and twenty of them now do. Named exactly,
+# because a rule that accepted any component would accept a component that drops the value.
+DELEGATED = re.compile(
+    rf"<StatusLine\s+message=(?:(\w+)\s*\.\s*)?(\w*(?:{_SPOKEN_ALTERNATION}))\s*/>"
+)
+
+# Where that component lives, and what it has to keep doing for the delegation above to be honest.
+RENDERER = "components/kit.rs"
 
 # What makes a rendered message reach somebody who is not looking at it. `role="alert"` is the
 # assertive form and is deliberately allowed as an alternative rather than required: most of these
@@ -61,6 +76,19 @@ def spoken(name: str) -> bool:
     return name.endswith(SPOKEN)
 
 
+def markup_only(text: str) -> str:
+    """Drop comment lines, so prose about a rule cannot satisfy the rule.
+
+    Found by removing the live region from the component that draws every status line and watching
+    this check stay green: the doc comment above it explains why `role="status"` is right, and the
+    search for a live region matched the explanation. A check a comment can satisfy is a check that
+    passes on a file that does nothing.
+    """
+    return "\n".join(
+        line for line in text.splitlines() if not line.lstrip().startswith("//")
+    )
+
+
 def main() -> int:
     root = pathlib.Path(__file__).resolve().parent.parent
     components = root / "crates" / "living-canvas" / "src" / "components"
@@ -84,6 +112,10 @@ def main() -> int:
             writes[key] = writes.get(key, 0) + 1
 
         reads = {(receiver, name) for receiver, name in READ.findall(text) if spoken(name)}
+        delegated = {
+            (receiver, name) for receiver, name in DELEGATED.findall(text) if spoken(name)
+        }
+        reads |= delegated
         # A split signal writes through `set_x` and is read through `x`; treating the setter as its
         # own name would report every one of them as unheard.
         reads |= {(receiver, "set_" + name) for receiver, name in reads}
@@ -102,11 +134,27 @@ def main() -> int:
         # Visible is half of it. A panel that has just refused a write, lost its connection or
         # finished a replace has changed, and a person not looking at it is told by the live region
         # or not at all. This crate carried none until 2026-08-30.
-        if reads and not LIVE_REGION.search(text):
+        # A panel that delegates carries no live region of its own and needs none: the component it
+        # hands the signal to has one, which is checked below rather than assumed.
+        if reads and not delegated and not LIVE_REGION.search(markup_only(text)):
             problems.append(
                 f"error: {relative} renders a message and has no live region, so a screen reader "
                 f"is never told the panel said anything"
             )
+
+    # The delegation above is only as good as the component it delegates to. If the status line
+    # ever stops announcing itself, twenty panels stop announcing themselves at once and every one
+    # of them still looks correct on its own.
+    renderer = components.parent / RENDERER
+    if not renderer.is_file():
+        problems.append(
+            f"error: {RENDERER} is missing, and twenty panels hand it their status message"
+        )
+    elif not LIVE_REGION.search(markup_only(renderer.read_text(encoding="utf-8"))):
+        problems.append(
+            f"error: {RENDERER} draws the status line for every panel and has no live region, so a "
+            f"screen reader is never told any of them said anything"
+        )
 
     for problem in problems:
         print(problem, file=sys.stderr)

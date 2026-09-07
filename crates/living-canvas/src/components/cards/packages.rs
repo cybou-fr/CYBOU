@@ -3,6 +3,7 @@
 
 //! Software Package Manager card component with governed Action1 operations.
 
+use crate::components::kit::StatusLine;
 use cybou_protocol::SubjectRef;
 use cybou_protocol::system::{PackageActionKind, PackageStatus};
 use leptos::prelude::*;
@@ -127,7 +128,7 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <span style="font-weight: 600; font-size: 13px;">"Software Packages"</span>
                     <button
-                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                        class="tool-btn"
                         title="Refresh repositories"
                         on:click=move |_| load_packages()
                     >
@@ -178,14 +179,7 @@ pub fn PackagesContent(card: CardId) -> impl IntoView {
             </div>
 
             // Status message toast
-            {move || signals.status_msg.get().map(|msg| {
-                view! {
-                    <div class="card-status-line" role="status" aria-live="polite">
-                        <span>{msg}</span>
-                        <button class="card-status-dismiss" title="Dismiss" on:click=move |_| signals.status_msg.set(None)>"×"</button>
-                    </div>
-                }
-            })}
+            <StatusLine message=signals.status_msg />
 
             // Packages List
             <div style="flex: 1; overflow-y: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 6px;">

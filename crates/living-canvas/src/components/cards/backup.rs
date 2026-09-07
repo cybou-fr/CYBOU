@@ -3,6 +3,7 @@
 
 //! Borg & Btrfs Automated Backup Vault card component.
 
+use crate::components::kit::StatusLine;
 use crate::{CardId, MindClient, components::icons::IconRefresh, tool_state::ToolCardStates};
 use leptos::prelude::*;
 
@@ -133,14 +134,14 @@ pub fn BackupContent(card: CardId) -> impl IntoView {
     });
 
     view! {
-        <div class="backup-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; overflow-y: auto;">
+        <div class="backup-panel tool-body">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
+            <div class="tool-toolbar">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-weight: 600; font-size: 13px;">"Deduplicating Backup Vault"</span>
                 </div>
                 <button
-                    style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                    class="tool-btn"
                     title="Refresh backup vault"
                     on:click=move |_| load_backup()
                 >
@@ -149,14 +150,7 @@ pub fn BackupContent(card: CardId) -> impl IntoView {
             </div>
 
             // Status message toast
-            {move || signals.status_msg.get().map(|msg| {
-                view! {
-                    <div class="card-status-line" role="status" aria-live="polite">
-                        <span>{msg}</span>
-                        <button class="card-status-dismiss" title="Dismiss" on:click=move |_| signals.status_msg.set(None)>"×"</button>
-                    </div>
-                }
-            })}
+            <StatusLine message=signals.status_msg />
 
             {move || signals.backup_settings.get().map(|bs| {
                 let repo = bs.repository.expect("a known backup projection has a repository");
@@ -204,7 +198,7 @@ pub fn BackupContent(card: CardId) -> impl IntoView {
                         </div>
 
                         // Historical Archives Timeline
-                        <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px;">
+                        <div class="tool-row">
                             <div style="font-weight: 600; font-size: 11px; margin-bottom: 8px;">
                                 {format!("Snapshot Archives ({})", archives.len())}
                             </div>

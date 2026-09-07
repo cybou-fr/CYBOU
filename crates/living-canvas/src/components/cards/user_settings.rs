@@ -3,6 +3,7 @@
 
 //! User Accounts and SSH Authorized Keys settings card component.
 
+use crate::components::kit::StatusLine;
 use crate::{CardId, MindClient, components::icons::IconRefresh, tool_state::ToolCardStates};
 use leptos::prelude::*;
 
@@ -126,14 +127,14 @@ pub fn UserSettingsContent(card: CardId) -> impl IntoView {
     });
 
     view! {
-        <div class="user-settings-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; overflow-y: auto;">
+        <div class="user-settings-panel tool-body">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
+            <div class="tool-toolbar">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-weight: 600; font-size: 13px;">"User Accounts & SSH Keys"</span>
                 </div>
                 <button
-                    style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                    class="tool-btn"
                     title="Refresh user accounts"
                     on:click=move |_| load_users()
                 >
@@ -142,18 +143,11 @@ pub fn UserSettingsContent(card: CardId) -> impl IntoView {
             </div>
 
             // Status message toast
-            {move || signals.status_msg.get().map(|msg| {
-                view! {
-                    <div class="card-status-line" role="status" aria-live="polite">
-                        <span>{msg}</span>
-                        <button class="card-status-dismiss" title="Dismiss" on:click=move |_| signals.status_msg.set(None)>"×"</button>
-                    </div>
-                }
-            })}
+            <StatusLine message=signals.status_msg />
 
             <div style="padding: 12px; display: flex; flex-direction: column; gap: 14px;">
                 // User Accounts Section
-                <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px;">
+                <div class="tool-row">
                     <div style="font-weight: 600; font-size: 11px; margin-bottom: 8px;">
                         {move || format!("Configured Accounts ({})", signals.users.get().len())}
                     </div>
@@ -218,7 +212,7 @@ pub fn UserSettingsContent(card: CardId) -> impl IntoView {
                 </div>
 
                 // Authorized SSH Keys Section
-                <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px;">
+                <div class="tool-row">
                     <div style="font-weight: 600; font-size: 11px; margin-bottom: 8px;">
                         {move || format!("Authorized SSH Keys ({})", signals.ssh_keys.get().len())}
                     </div>

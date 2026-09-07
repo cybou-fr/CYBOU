@@ -3,6 +3,7 @@
 
 //! Personal Calendar & Event Schedule card component.
 
+use crate::components::kit::StatusLine;
 use crate::{CardId, MindClient, components::icons::IconRefresh, tool_state::ToolCardStates};
 use leptos::prelude::*;
 
@@ -81,9 +82,9 @@ pub fn CalendarContent(card: CardId) -> impl IntoView {
     });
 
     view! {
-        <div class="calendar-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; overflow-y: auto;">
+        <div class="calendar-panel tool-body">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
+            <div class="tool-toolbar">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-weight: 600; font-size: 13px;">"Calendar & Cognitive Schedules"</span>
                 </div>
@@ -95,7 +96,7 @@ pub fn CalendarContent(card: CardId) -> impl IntoView {
                         {move || if signals.is_creating.get() { "Cancel" } else { "+ Event" }}
                     </button>
                     <button
-                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                        class="tool-btn"
                         title="Refresh calendar"
                         on:click=move |_| load_calendar()
                     >
@@ -105,14 +106,7 @@ pub fn CalendarContent(card: CardId) -> impl IntoView {
             </div>
 
             // Status message toast
-            {move || signals.status_msg.get().map(|msg| {
-                view! {
-                    <div class="card-status-line" role="status" aria-live="polite">
-                        <span>{msg}</span>
-                        <button class="card-status-dismiss" title="Dismiss" on:click=move |_| signals.status_msg.set(None)>"×"</button>
-                    </div>
-                }
-            })}
+            <StatusLine message=signals.status_msg />
 
             <div style="padding: 12px; display: flex; flex-direction: column; gap: 12px;">
                 // Create Event Inline Form

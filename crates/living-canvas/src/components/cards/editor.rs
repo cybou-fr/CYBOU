@@ -3,6 +3,7 @@
 
 //! Text and configuration editor tool card component (ADR-0045).
 
+use crate::components::kit::StatusLine;
 use cybou_web_contracts::{
     HostFileCreateRequest, HostFileWriteRequest, SessionMode, UserDraftSaveRequest,
 };
@@ -749,18 +750,7 @@ pub fn EditorContent(
                 // that was re-read, how many occurrences a replace changed, the authority a file
                 // was admitted under. A message written to a signal nothing renders is a panel
                 // that answered and was not heard.
-                {move || status_msg.get().map(|message| view! {
-                    <div class="card-status-line" role="status">
-                        <span>{message}</span>
-                        <button
-                            class="card-status-dismiss"
-                            title="Dismiss"
-                            on:click=move |_| status_msg.set(None)
-                        >
-                            "×"
-                        </button>
-                    </div>
-                })}
+                <StatusLine message=status_msg />
 
                 {move || {
                     let tab = active_tab();

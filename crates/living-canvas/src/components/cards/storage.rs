@@ -3,6 +3,7 @@
 
 //! Storage and Btrfs Snapshots card component.
 
+use crate::components::kit::StatusLine;
 use crate::{
     CardId, MindClient,
     components::icons::{IconFile, IconRefresh},
@@ -96,15 +97,15 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
     });
 
     view! {
-        <div class="storage-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; overflow-y: auto;">
+        <div class="storage-panel tool-body">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
+            <div class="tool-toolbar">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <IconFile size=14 />
                     <span style="font-weight: 600; font-size: 13px;">"Storage & Btrfs Snapshots"</span>
                 </div>
                 <button
-                    style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                    class="tool-btn"
                     title="Refresh storage"
                     on:click=move |_| load_storage()
                 >
@@ -113,14 +114,7 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
             </div>
 
             // Status message toast
-            {move || signals.status_msg.get().map(|msg| {
-                view! {
-                    <div class="card-status-line" role="status" aria-live="polite">
-                        <span>{msg}</span>
-                        <button class="card-status-dismiss" title="Dismiss" on:click=move |_| signals.status_msg.set(None)>"×"</button>
-                    </div>
-                }
-            })}
+            <StatusLine message=signals.status_msg />
 
             {move || signals.storage.get().map(|st| {
                 let used_bytes = st.total_space_bytes.saturating_sub(st.free_space_bytes);
@@ -131,7 +125,7 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
                 view! {
                     <div style="padding: 12px; display: flex; flex-direction: column; gap: 14px;">
                         // Storage Pool Capacity
-                        <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px;">
+                        <div class="tool-row">
                             <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 11px;">
                                 <span style="font-weight: 600;">"Btrfs Pool Capacity"</span>
                                 <span style="font-family: monospace; color: var(--info);">{format!("{used_gb:.0} / {total_gb:.0} GB ({pct:.1}%)")}</span>
@@ -142,7 +136,7 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
                         </div>
 
                         // Subvolumes
-                        <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px;">
+                        <div class="tool-row">
                             <div style="font-weight: 600; font-size: 11px; margin-bottom: 8px;">"Subvolumes"</div>
                             <div style="display: flex; flex-direction: column; gap: 6px;">
                                 {st.subvolumes.into_iter().map(|sub| {
@@ -166,7 +160,7 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
                         </div>
 
                         // Create Snapshot Section
-                        <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px;">
+                        <div class="tool-row">
                             <div style="font-weight: 600; font-size: 11px; margin-bottom: 8px;">"Create Point-in-Time Snapshot"</div>
                             <div style="display: flex; gap: 8px; align-items: center;">
                                 <input
@@ -186,7 +180,7 @@ pub fn StorageContent(card: CardId) -> impl IntoView {
                         </div>
 
                         // Snapshots List
-                        <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px;">
+                        <div class="tool-row">
                             <div style="font-weight: 600; font-size: 11px; margin-bottom: 8px;">
                                 {format!("Snapshots ({})", st.snapshots.len())}
                             </div>

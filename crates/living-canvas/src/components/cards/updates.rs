@@ -3,6 +3,7 @@
 
 //! System Software & Kernel Updates card component.
 
+use crate::components::kit::StatusLine;
 use crate::{CardId, MindClient, components::icons::IconRefresh, tool_state::ToolCardStates};
 use leptos::prelude::*;
 
@@ -62,15 +63,15 @@ pub fn UpdatesContent(card: CardId) -> impl IntoView {
     });
 
     view! {
-        <div class="updates-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; overflow-y: auto;">
+        <div class="updates-panel tool-body">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
+            <div class="tool-toolbar">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <IconRefresh size=14 />
                     <span style="font-weight: 600; font-size: 13px;">"System & Kernel Updates"</span>
                 </div>
                 <button
-                    style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                    class="tool-btn"
                     title="Check for updates"
                     on:click=move |_| load_updates()
                 >
@@ -79,14 +80,7 @@ pub fn UpdatesContent(card: CardId) -> impl IntoView {
             </div>
 
             // Status message toast
-            {move || signals.status_msg.get().map(|msg| {
-                view! {
-                    <div class="card-status-line" role="status" aria-live="polite">
-                        <span>{msg}</span>
-                        <button class="card-status-dismiss" title="Dismiss" on:click=move |_| signals.status_msg.set(None)>"×"</button>
-                    </div>
-                }
-            })}
+            <StatusLine message=signals.status_msg />
 
             {move || signals.updates.get().map(|u| {
                 let summary = u.summary;

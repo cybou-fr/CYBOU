@@ -3,6 +3,7 @@
 
 //! Process Manager card component for monitoring and controlling OS processes.
 
+use crate::components::kit::StatusLine;
 use cybou_protocol::SubjectRef;
 use cybou_protocol::system::ProcessSignal;
 use leptos::prelude::*;
@@ -224,14 +225,7 @@ pub fn ProcessesContent(card: CardId) -> impl IntoView {
             </div>
 
             // Status message toast
-            {move || signals.status_msg.get().map(|msg| {
-                view! {
-                    <div class="card-status-line" role="status" aria-live="polite">
-                        <span>{msg}</span>
-                        <button class="card-status-dismiss" title="Dismiss" on:click=move |_| signals.status_msg.set(None)>"×"</button>
-                    </div>
-                }
-            })}
+            <StatusLine message=signals.status_msg />
 
             // Process Table Header
             <div style="display: grid; grid-template-columns: 60px 1fr 70px 75px 65px 90px; padding: 6px 12px; font-size: 10px; font-weight: 700; color: var(--text-faint); border-bottom: 1px solid var(--fill-faintest); text-transform: uppercase;">

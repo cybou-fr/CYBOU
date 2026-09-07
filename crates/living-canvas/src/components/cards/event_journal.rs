@@ -3,6 +3,7 @@
 
 //! Canonical Event1 Journal timeline & replay card component.
 
+use crate::components::kit::StatusLine;
 use crate::{
     CardId, MindClient,
     components::icons::{IconLayers, IconRefresh},
@@ -42,7 +43,7 @@ pub fn EventJournalContent(card: CardId) -> impl IntoView {
     view! {
         <div class="event-journal-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden;">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
+            <div class="tool-toolbar">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <IconLayers size=16 />
                     <span style="font-weight: 600; font-size: 13px;">"Canonical Event1 Journal"</span>
@@ -56,7 +57,7 @@ pub fn EventJournalContent(card: CardId) -> impl IntoView {
                         style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: inherit; width: 140px;"
                     />
                     <button
-                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                        class="tool-btn"
                         title="Refresh journal"
                         on:click=move |_| load_journal()
                     >
@@ -66,14 +67,7 @@ pub fn EventJournalContent(card: CardId) -> impl IntoView {
             </div>
 
             // Status message toast
-            {move || signals.status_msg.get().map(|msg| {
-                view! {
-                    <div class="card-status-line" role="status" aria-live="polite">
-                        <span>{msg}</span>
-                        <button class="card-status-dismiss" title="Dismiss" on:click=move |_| signals.status_msg.set(None)>"×"</button>
-                    </div>
-                }
-            })}
+            <StatusLine message=signals.status_msg />
 
             // Journal Timeline List
             <div style="flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px;">

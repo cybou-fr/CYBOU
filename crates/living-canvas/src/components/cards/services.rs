@@ -3,6 +3,7 @@
 
 //! Services Manager card component for managing systemd units and daemons.
 
+use crate::components::kit::StatusLine;
 use cybou_protocol::SubjectRef;
 use cybou_protocol::system::{ServiceAction, ServiceState};
 use leptos::prelude::*;
@@ -229,14 +230,7 @@ pub fn ServicesContent(card: CardId) -> impl IntoView {
             </div>
 
             // Status message toast
-            {move || signals.status_msg.get().map(|msg| {
-                view! {
-                    <div class="card-status-line" role="status" aria-live="polite">
-                        <span>{msg}</span>
-                        <button class="card-status-dismiss" title="Dismiss" on:click=move |_| signals.status_msg.set(None)>"×"</button>
-                    </div>
-                }
-            })}
+            <StatusLine message=signals.status_msg />
 
             // Services Feed
             <div style="flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px;">

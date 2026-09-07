@@ -3,6 +3,7 @@
 
 //! System Resource Monitor and Hardware Telemetry card component.
 
+use crate::components::kit::StatusLine;
 use crate::{
     CardId, MindClient,
     components::{freshness::FreshnessControls, icons::IconActivity},
@@ -61,9 +62,9 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
     );
 
     view! {
-        <div class="monitor-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; overflow-y: auto;">
+        <div class="monitor-panel tool-body">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
+            <div class="tool-toolbar">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <IconActivity size=14 />
                     <span style="font-weight: 600; font-size: 13px;">"Hardware Telemetry & Monitor"</span>
@@ -79,18 +80,7 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
             // The panel wrote "Failed to load telemetry" into a signal nothing read, so a host
             // whose gateway could not be reached drew an empty Monitor: indistinguishable from a
             // machine doing nothing, which is the one reading this panel must never give.
-            {move || signals.status_msg.get().map(|message| view! {
-                <div class="card-status-line" role="status">
-                    <span>{message}</span>
-                    <button
-                        class="card-status-dismiss"
-                        title="Dismiss"
-                        on:click=move |_| signals.status_msg.set(None)
-                    >
-                        "×"
-                    </button>
-                </div>
-            })}
+            <StatusLine message=signals.status_msg />
 
             // And an unread projection is not an empty one. Until telemetry arrives this says it
             // has not arrived, rather than drawing a host with no memory and no disks.
@@ -145,7 +135,7 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
                         </div>
 
                         // CPU Utilization
-                        <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px;">
+                        <div class="tool-row">
                             <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 11px;">
                                 <span style="font-weight: 600;">"CPU Utilization"</span>
                                 <span style="font-weight: 700; color: var(--accent-light); font-family: monospace;">{format!("{:.1}%", mon.total_cpu_percent)}</span>
@@ -202,7 +192,7 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
                         </div>
 
                         // Disk Storage
-                        <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px;">
+                        <div class="tool-row">
                             <div style="font-weight: 600; font-size: 11px; margin-bottom: 8px;">"Storage Partitions"</div>
                             <div style="display: flex; flex-direction: column; gap: 8px;">
                                 {mon.disk_partitions.into_iter().map(|disk| {
@@ -233,7 +223,7 @@ pub fn MonitorContent(card: CardId) -> impl IntoView {
                         </div>
 
                         // Network Interfaces
-                        <div style="background: var(--fill-faint); border: 1px solid var(--fill-subtle); border-radius: 6px; padding: 10px 12px;">
+                        <div class="tool-row">
                             <div style="font-weight: 600; font-size: 11px; margin-bottom: 8px;">"Network Interfaces"</div>
                             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px;">
                                 {mon.network_interfaces.into_iter().map(|iface| {

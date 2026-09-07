@@ -3,6 +3,7 @@
 
 //! Personal Mail & Messages card component.
 
+use crate::components::kit::StatusLine;
 use crate::{CardId, MindClient, components::icons::IconRefresh, tool_state::ToolCardStates};
 use leptos::prelude::*;
 
@@ -77,7 +78,7 @@ pub fn MailContent(card: CardId) -> impl IntoView {
     view! {
         <div class="mail-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden;">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
+            <div class="tool-toolbar">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-weight: 600; font-size: 13px;">"Personal Mail & Messages"</span>
                 </div>
@@ -89,7 +90,7 @@ pub fn MailContent(card: CardId) -> impl IntoView {
                         {move || if signals.is_composing.get() { "Cancel" } else { "Compose" }}
                     </button>
                     <button
-                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                        class="tool-btn"
                         title="Refresh mail"
                         on:click=move |_| load_mail()
                     >
@@ -99,14 +100,7 @@ pub fn MailContent(card: CardId) -> impl IntoView {
             </div>
 
             // Status message toast
-            {move || signals.status_msg.get().map(|msg| {
-                view! {
-                    <div class="card-status-line" role="status" aria-live="polite">
-                        <span>{msg}</span>
-                        <button class="card-status-dismiss" title="Dismiss" on:click=move |_| signals.status_msg.set(None)>"×"</button>
-                    </div>
-                }
-            })}
+            <StatusLine message=signals.status_msg />
 
             // Compose form or message list
             {move || if signals.is_composing.get() {

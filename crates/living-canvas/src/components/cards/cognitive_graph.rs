@@ -3,6 +3,7 @@
 
 //! Deep Cognitive Graph & Causal DAG card component.
 
+use crate::components::kit::StatusLine;
 use crate::{
     CardId, MindClient,
     components::icons::{IconLayers, IconRefresh},
@@ -59,7 +60,7 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
     view! {
         <div class="cognitive-graph-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden;">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
+            <div class="tool-toolbar">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <IconLayers size=16 />
                     <span style="font-weight: 600; font-size: 13px;">"Cognitive Graph & Causal DAG"</span>
@@ -76,7 +77,7 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
                         style="background: var(--bg-sunken-strong); border: 1px solid var(--fill-hover); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: inherit; width: 160px;"
                     />
                     <button
-                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                        class="tool-btn"
                         title="Refresh graph"
                         on:click=move |_| load_graph()
                     >
@@ -86,14 +87,7 @@ pub fn CognitiveGraphContent(card: CardId) -> impl IntoView {
             </div>
 
             // Status message toast
-            {move || signals.status_msg.get().map(|msg| {
-                view! {
-                    <div class="card-status-line" role="status" aria-live="polite">
-                        <span>{msg}</span>
-                        <button class="card-status-dismiss" title="Dismiss" on:click=move |_| signals.status_msg.set(None)>"×"</button>
-                    </div>
-                }
-            })}
+            <StatusLine message=signals.status_msg />
 
             // Main 2-column view: Nodes & Causal DAG list + Inspector
             <div style="display: flex; flex: 1; overflow: hidden;">

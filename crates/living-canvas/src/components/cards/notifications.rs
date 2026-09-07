@@ -3,6 +3,7 @@
 
 //! Notifications Center card component for desktop attention, evidence, system, and agent feeds.
 
+use crate::components::kit::StatusLine;
 use cybou_protocol::notification::{NotificationCategory, NotificationSeverity};
 use leptos::prelude::*;
 use uuid::Uuid;
@@ -138,7 +139,7 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
                             "Dismiss All"
                         </button>
                         <button
-                            style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                            class="tool-btn"
                             title="Refresh"
                             on:click=move |_| load_notifications()
                         >
@@ -211,14 +212,7 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
             </div>
 
             // Status message toast
-            {move || signals.status_msg.get().map(|msg| {
-                view! {
-                    <div class="card-status-line" role="status" aria-live="polite">
-                        <span>{msg}</span>
-                        <button class="card-status-dismiss" title="Dismiss" on:click=move |_| signals.status_msg.set(None)>"×"</button>
-                    </div>
-                }
-            })}
+            <StatusLine message=signals.status_msg />
 
             // Notifications Feed
             <div style="flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;">

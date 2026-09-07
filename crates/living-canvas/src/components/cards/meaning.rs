@@ -77,7 +77,7 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
     view! {
         <div class="meaning-panel" style="display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden;">
             // Header
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--line);">
+            <div class="tool-toolbar">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <IconBot size=16 />
                     <span style="font-weight: 600; font-size: 13px;">"Meaning1 & Dialogue Assistant"</span>
@@ -94,7 +94,7 @@ pub fn MeaningContent(card: CardId) -> impl IntoView {
                         <option value="fr">"Français (FR)"</option>
                     </select>
                     <button
-                        style="background: var(--fill-subtle); border: none; border-radius: 4px; padding: 4px 6px; color: inherit; cursor: pointer;"
+                        class="tool-btn"
                         title="Refresh memory"
                         on:click=move |_| load_dialogue_memory()
                     >
