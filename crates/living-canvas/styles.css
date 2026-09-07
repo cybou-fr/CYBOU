@@ -1438,6 +1438,51 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .fm-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 10px 8px; border-radius: 10px; border: 1px solid rgba(154, 167, 184, 0.1); background: rgba(255, 255, 255, 0.025); cursor: pointer; transition: all 120ms ease; user-select: none; text-align: center; }
 .fm-item:hover { background: rgba(112, 225, 200, 0.08); border-color: rgba(112, 225, 200, 0.3); transform: translateY(-1px); }
 .fm-item.selected { background: rgba(112, 225, 200, 0.12); border-color: var(--accent); }
+/* Where the keyboard is, which is not the same as what is being previewed: a person arrowing down
+   a listing passes over folders, and a folder has nothing to preview. Drawn as an outline so the
+   two can be true of the same row at once. */
+.fm-item.at-cursor { outline: 1px solid var(--accent); outline-offset: 1px; }
+.fm-grid:focus { outline: none; }
+.fm-grid:focus-visible { outline: 1px solid rgba(112, 225, 200, 0.4); outline-offset: 2px; }
+
+/* What a right-click offers on one entry. Placed at the pointer, so it is where the person is
+   looking rather than where the panel would have put it. */
+.fm-menu-backdrop { position: fixed; inset: 0; z-index: 1110; }
+.fm-menu {
+  position: fixed;
+  z-index: 1111;
+  display: grid;
+  gap: 1px;
+  min-width: 172px;
+  padding: 5px;
+  background: rgba(8, 16, 26, 0.97);
+  border: 1px solid rgba(154, 167, 184, 0.2);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+}
+.fm-menu-title {
+  padding: 4px 9px 6px;
+  color: var(--muted);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fm-menu-item {
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #dfe8ed;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.fm-menu-item:hover { background: rgba(255, 255, 255, 0.08); }
+/* The one that cannot be taken back, coloured as such and separated from what sits above it. */
+.fm-menu-item.danger { color: #f87171; }
+.fm-menu-item.danger:hover { background: rgba(248, 113, 113, 0.12); }
+.fm-menu-separator { height: 1px; margin: 4px 2px; background: rgba(154, 167, 184, 0.16); }
 .fm-item.is-dir { color: #d9a62f; }
 .fm-item.is-file { color: #94a3b8; }
 .fm-item-name { font-size: 11px; font-weight: 500; word-break: break-word; line-height: 1.2; color: #dfe8ed; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
@@ -4098,42 +4143,10 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 
 /* Shown on hover over a row, so a list of files is a list of files rather than a wall of
    buttons — but always present for a keyboard, which cannot hover. */
-.fm-item-quick-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: auto;
-  opacity: 0;
-}
 
-.fm-item:hover .fm-item-quick-actions,
-.fm-item:focus-within .fm-item-quick-actions {
-  opacity: 1;
-}
 
-.fm-item-action-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: none;
-  border-radius: 4px;
-  color: var(--text-muted, #94a3b8);
-  background: transparent;
-  cursor: pointer;
-}
 
-.fm-item-action-btn:hover {
-  color: var(--text-main, #e0e0e0);
-  background: rgba(255, 255, 255, 0.1);
-}
 
-.fm-item-action-btn.danger:hover {
-  color: #fca5a5;
-  background: rgba(239, 68, 68, 0.18);
-}
 
 .fm-action-toast {
   display: flex;

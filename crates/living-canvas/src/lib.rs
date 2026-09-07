@@ -27,6 +27,7 @@ pub mod ansi;
 pub mod applications;
 pub mod card;
 pub mod deck;
+pub mod file_browser;
 pub mod heading;
 pub mod instant;
 pub mod layout;

@@ -18,9 +18,8 @@ use crate::{
     components::{
         card_frame::CardFrame,
         icons::{
-            IconArrowLeft, IconBot, IconCopy, IconDownload, IconEdit, IconFile, IconFolder,
-            IconFolderPlus, IconHome, IconPlus, IconRefresh, IconSearch, IconShield, IconTrash,
-            IconUpload,
+            IconArrowLeft, IconBot, IconCopy, IconEdit, IconFile, IconFolder, IconFolderPlus,
+            IconHome, IconPlus, IconRefresh, IconSearch, IconShield, IconUpload,
         },
     },
     interaction::{DragState, ResizeState},
@@ -124,6 +123,8 @@ pub fn FileManagerContent(
     let rename_new_name = state.rename_new_name;
     let delete_modal_open = state.delete_modal_open;
     let delete_target = state.delete_target;
+    let cursor = state.cursor;
+    let context_menu = state.context_menu;
 
     let default_root_for_category = move |cat: LocationCategory| -> String {
         match cat {
@@ -720,6 +721,115 @@ pub fn FileManagerContent(
         ));
     };
 
+    // One click puts the cursor on something. Two open it. That is the distinction the panel did
+    // not make: a single click walked into folders, so a person could not point at one without
+    // going into it, and could not point at anything at all with the keyboard.
+    let select_entry = move |name: String, is_dir: bool| {
+        context_menu.set(None);
+        cursor.set(Some(name.clone()));
+        if is_dir {
+            // A folder has no contents to preview. Clearing the pane is the honest answer to
+            // pointing at one, rather than leaving the last file's text under a folder's name.
+            selected_file.set(None);
+        } else {
+            view_file(name);
+        }
+    };
+
+    let open_entry = move |name: String, is_dir: bool| {
+        context_menu.set(None);
+        cursor.set(Some(name.clone()));
+        if is_dir {
+            let path = crate::file_browser::child_path(&current_path.get_untracked(), &name);
+            load_dir(path);
+        } else {
+            open_in_editor(name);
+        }
+    };
+
+    let cursor_entry = move || -> Option<(String, bool)> {
+        let at = cursor.get_untracked()?;
+        display_entries()
+            .into_iter()
+            .find(|(name, _, _)| *name == at)
+            .map(|(name, is_dir, _)| (name, is_dir))
+    };
+
+    let step_cursor = move |delta: i32| {
+        let shown: Vec<String> = display_entries()
+            .into_iter()
+            .map(|(name, _, _)| name)
+            .collect();
+        let at = cursor.get_untracked();
+        // Only the cursor moves. Reading a file on every arrow key would have somebody holding the
+        // key down issue a request per row of the directory.
+        if let Some(next) = crate::file_browser::move_cursor(&shown, at.as_deref(), delta) {
+            cursor.set(Some(next));
+        }
+    };
+
+    let begin_rename = move |name: String| {
+        rename_target.set(Some(name.clone()));
+        rename_new_name.set(name);
+        rename_modal_open.set(true);
+    };
+
+    let begin_delete = move |entry: (String, bool)| {
+        delete_target.set(Some(entry));
+        delete_modal_open.set(true);
+    };
+
+    let run_action = move |action: crate::file_browser::EntryAction, name: String, is_dir: bool| {
+        use crate::file_browser::EntryAction;
+        context_menu.set(None);
+        match action {
+            EntryAction::Open => open_entry(name, is_dir),
+            EntryAction::OpenInEditor => open_in_editor(name),
+            EntryAction::TerminalHere => {
+                // The terminal starts in the folder the panel is showing, so walking into the one
+                // that was asked about is part of the action rather than a step before it.
+                let path = crate::file_browser::child_path(&current_path.get_untracked(), &name);
+                load_dir(path);
+                open_terminal_here();
+            }
+            EntryAction::Download => download_file(name),
+            EntryAction::Rename => begin_rename(name),
+            EntryAction::Delete => begin_delete((name, is_dir)),
+        }
+    };
+
+    let on_list_key = move |event: web_sys::KeyboardEvent| match event.key().as_str() {
+        "ArrowDown" => {
+            event.prevent_default();
+            step_cursor(1);
+        }
+        "ArrowUp" => {
+            event.prevent_default();
+            step_cursor(-1);
+        }
+        "Enter" => {
+            if let Some((name, is_dir)) = cursor_entry() {
+                open_entry(name, is_dir);
+            }
+        }
+        "Backspace" => {
+            event.prevent_default();
+            go_up();
+        }
+        "F2" => {
+            if let Some((name, _)) = cursor_entry() {
+                begin_rename(name);
+            }
+        }
+        "Delete" => {
+            if let Some(entry) = cursor_entry() {
+                begin_delete(entry);
+            }
+        }
+        "Escape" => context_menu.set(None),
+        _ => {}
+    };
+
     view! {
         <Show
             when=move || !is_public_preview()
@@ -1118,7 +1228,13 @@ pub fn FileManagerContent(
                         </Show>
 
                         <div class="fm-content">
-                            <div class="fm-grid">
+                            <div
+                                class="fm-grid"
+                                tabindex="0"
+                                role="listbox"
+                                aria-label="Directory listing"
+                                on:keydown=on_list_key
+                            >
                                 <Show when=move || loading.get()>
                                     <div class="fm-empty">"Loading directory…"</div>
                                 </Show>
@@ -1136,11 +1252,15 @@ pub fn FileManagerContent(
                                     children=move |(name, is_dir, size)| {
                                         let n = name.clone();
                                         let n_click = name.clone();
+                                        let n_open = name.clone();
                                         let n_menu = name.clone();
-                                        let p = current_path.get();
                                         let is_selected = {
                                             let cur_sel = selected_file.get();
                                             cur_sel.as_ref() == Some(&name)
+                                        };
+                                        let is_cursor = {
+                                            let at = cursor.get();
+                                            at.as_ref() == Some(&name)
                                         };
                                         view! {
                                             <div
@@ -1148,17 +1268,21 @@ pub fn FileManagerContent(
                                                 class:is-dir=is_dir
                                                 class:is-file=!is_dir
                                                 class:selected=is_selected
-                                                on:click=move |_| {
-                                                    if is_dir {
-                                                        let new_p = if p == "/" {
-                                                            format!("/{n_click}")
-                                                        } else {
-                                                            format!("{p}/{n_click}")
-                                                        };
-                                                        load_dir(new_p);
-                                                    } else {
-                                                        view_file(n_click.clone());
-                                                    }
+                                                class:at-cursor=is_cursor
+                                                on:click=move |_| select_entry(n_click.clone(), is_dir)
+                                                on:dblclick=move |_| open_entry(n_open.clone(), is_dir)
+                                                on:contextmenu=move |event: web_sys::MouseEvent| {
+                                                    // The browser menu here would offer to save the
+                                                    // row as an image and to inspect it, on a
+                                                    // desktop where the person meant the file.
+                                                    event.prevent_default();
+                                                    cursor.set(Some(n_menu.clone()));
+                                                    context_menu.set(Some((
+                                                        n_menu.clone(),
+                                                        is_dir,
+                                                        f64::from(event.client_x()),
+                                                        f64::from(event.client_y()),
+                                                    )));
                                                 }
                                             >
                                                 {if is_dir {
@@ -1168,55 +1292,58 @@ pub fn FileManagerContent(
                                                 }}
                                                 <span class="fm-item-name">{n}</span>
                                                 <span class="fm-item-size">{if is_dir { "dir".to_string() } else { crate::tool_state::format_bytes(size) }}</span>
-                                                <div class="fm-item-quick-actions" on:click=move |e: web_sys::MouseEvent| e.stop_propagation()>
-                                                    {
-                                                        let n_rename = n_menu.clone();
-                                                        let n_delete = n_menu.clone();
-                                                        let n_download = n_menu.clone();
-                                                        view! {
-                                                            <Show when=move || !is_dir && transfers_available()>
-                                                                {
-                                                                    let n_download = n_download.clone();
-                                                                    view! {
-                                                                        <button
-                                                                            class="fm-item-action-btn"
-                                                                            title="Download"
-                                                                            on:click=move |_| download_file(n_download.clone())
-                                                                        >
-                                                                            <IconDownload size=11 />
-                                                                        </button>
-                                                                    }
-                                                                }
-                                                            </Show>
-                                                            <button
-                                                                class="fm-item-action-btn"
-                                                                title="Rename"
-                                                                on:click=move |_| {
-                                                                    rename_target.set(Some(n_rename.clone()));
-                                                                    rename_new_name.set(n_rename.clone());
-                                                                    rename_modal_open.set(true);
-                                                                }
-                                                            >
-                                                                <IconEdit size=11 />
-                                                            </button>
-                                                            <button
-                                                                class="fm-item-action-btn danger"
-                                                                title="Delete"
-                                                                on:click=move |_| {
-                                                                    delete_target.set(Some((n_delete.clone(), is_dir)));
-                                                                    delete_modal_open.set(true);
-                                                                }
-                                                            >
-                                                                <IconTrash size=11 />
-                                                            </button>
-                                                        }
-                                                    }
-                                                </div>
                                             </div>
                                         }
                                     }
                                 />
                             </div>
+
+                            <Show when=move || context_menu.get().is_some()>
+                                {move || {
+                                    let Some((name, is_dir, x, y)) = context_menu.get() else {
+                                        return ().into_any();
+                                    };
+                                    let actions =
+                                        crate::file_browser::actions_for(is_dir, transfers_available());
+                                    let style = format!("left: {x}px; top: {y}px;");
+                                    view! {
+                                        <div
+                                            class="fm-menu-backdrop"
+                                            role="presentation"
+                                            on:click=move |_| context_menu.set(None)
+                                            on:contextmenu=move |event: web_sys::MouseEvent| {
+                                                event.prevent_default();
+                                                context_menu.set(None);
+                                            }
+                                        ></div>
+                                        <div class="fm-menu" role="menu" style=style>
+                                            <span class="fm-menu-title">{name.clone()}</span>
+                                            {actions
+                                                .into_iter()
+                                                .map(|action| {
+                                                    let name = name.clone();
+                                                    view! {
+                                                        <>
+                                                            <Show when=move || action.opens_group()>
+                                                                <div class="fm-menu-separator"></div>
+                                                            </Show>
+                                                            <button
+                                                                class="fm-menu-item"
+                                                                class:danger=action.is_destructive()
+                                                                role="menuitem"
+                                                                on:click=move |_| run_action(action, name.clone(), is_dir)
+                                                            >
+                                                                {action.label()}
+                                                            </button>
+                                                        </>
+                                                    }
+                                                })
+                                                .collect_view()}
+                                        </div>
+                                    }
+                                    .into_any()
+                                }}
+                            </Show>
 
                             <Show when=move || selected_file.get().is_some()>
                                 <aside class="fm-preview">

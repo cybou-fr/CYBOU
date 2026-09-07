@@ -195,6 +195,15 @@ pub struct FileManagerSignals {
     pub delete_modal_open: RwSignal<bool>,
     /// Target item to delete (name, `is_dir`).
     pub delete_target: RwSignal<Option<(String, bool)>>,
+    /// The entry the keyboard is on.
+    ///
+    /// Separate from `selected_file`, which is the file whose contents are being previewed. A
+    /// person arrowing down a listing passes over folders, and a folder has no contents to preview;
+    /// folding the two together would either stop the cursor at every folder or open every file it
+    /// crossed.
+    pub cursor: RwSignal<Option<String>>,
+    /// The entry a right-click is asking about, and where the pointer was: name, `is_dir`, x, y.
+    pub context_menu: RwSignal<Option<(String, bool, f64, f64)>>,
 }
 
 impl FileManagerSignals {
@@ -228,6 +237,8 @@ impl FileManagerSignals {
             rename_new_name: RwSignal::new(String::new()),
             delete_modal_open: RwSignal::new(false),
             delete_target: RwSignal::new(None),
+            cursor: RwSignal::new(None),
+            context_menu: RwSignal::new(None),
         }
     }
 }
