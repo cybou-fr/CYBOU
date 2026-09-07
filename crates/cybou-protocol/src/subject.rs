@@ -22,6 +22,29 @@ pub enum SubjectDeepLinkError {
     OwnerResolutionRequired,
 }
 
+/// The kind of entity a lookup request or a surface is about, without an identifier.
+///
+/// Separate from [`SubjectQuery`] because a reader often needs the category alone: a panel that can
+/// present services can say so before any particular service exists to present.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SubjectKind {
+    /// A systemd unit.
+    Service,
+    /// A file or directory.
+    File,
+    /// An agent capsule.
+    Agent,
+    /// An installed package.
+    Package,
+    /// A spatial anchor.
+    Anchor,
+    /// A server-owned operation.
+    Operation,
+    /// An operating system process.
+    Process,
+}
+
 /// An identity-shaped lookup request that has not been resolved by an authoritative owner.
 ///
 /// Unlike [`SubjectRef`], this type carries no claim that an entity exists and cannot assign file
@@ -57,6 +80,20 @@ impl SubjectQuery {
             Self::Anchor(_) => "Anchor query",
             Self::Operation(_) => "Operation query",
             Self::Process(_) => "Process query",
+        }
+    }
+
+    /// The category this request is for, without its identifier.
+    #[must_use]
+    pub const fn kind(&self) -> SubjectKind {
+        match self {
+            Self::Service(_) => SubjectKind::Service,
+            Self::File(_) => SubjectKind::File,
+            Self::Agent(_) => SubjectKind::Agent,
+            Self::Package(_) => SubjectKind::Package,
+            Self::Anchor(_) => SubjectKind::Anchor,
+            Self::Operation(_) => SubjectKind::Operation,
+            Self::Process(_) => SubjectKind::Process,
         }
     }
 
@@ -469,6 +506,14 @@ mod tests {
         assert_eq!(
             SubjectQuery::from_subject_key("process/1234"),
             Some(SubjectQuery::Process("1234".to_string()))
+        );
+        assert_eq!(
+            SubjectQuery::Service("nginx.service".to_string()).kind(),
+            SubjectKind::Service
+        );
+        assert_eq!(
+            SubjectQuery::Process("1234".to_string()).kind(),
+            SubjectKind::Process
         );
         // The keys the perception sources write today name no entity. Turning one into a service
         // query would put a unit on the desktop that nothing ever observed.

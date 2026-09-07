@@ -66,6 +66,7 @@ Beside them, and deliberately not among them:
 | `cybou-agentd` | `org.cybou.Runtime.Agent1` — owns bounded agent launches, live sessions, teardown and recent final views; not Mind |
 | `cybou-personald@<account>` | one Linux account's own Personal Core, on a per-UID socket; the gateway proxies to it and owns none of it |
 | `cybou-operationd` | `org.cybou.Runtime.Operation1` — the sole lifecycle owner of long-running work: durable records, logs and cancellation intent; not Mind |
+| `cybou-spatial-policy` | a library, not a process — turns what Workspace1 attends to into suggestions a desktop may offer. Reaches nothing, owns no interface, and no owner or route calls it yet |
 
 **The sandboxed Safe Shell is gone**, and ADR-0047's Neutral note that kept it is reversed there.
 The card, the two routes, `cybou-shelld` and its unit are removed. Keeping it produced two cards a

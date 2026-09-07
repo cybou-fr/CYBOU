@@ -1411,6 +1411,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cybou-spatial-policy"
+version = "0.1.0"
+dependencies = [
+ "cybou-protocol",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
 name = "cybou-storage"
 version = "0.1.0"
 dependencies = [

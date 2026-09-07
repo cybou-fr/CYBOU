@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Cybou contributors
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "cybou-spatial-policy"
+description = "Deterministic spatial policy: what Mind attends to, into suggestions a desktop may offer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# Deliberately thin. This crate reaches nothing: no D-Bus, no HTTP, no filesystem, no clock, no
+# randomness. A policy that could read something could justify a suggestion with a fact its caller
+# never saw, and every suggestion here has to be answerable from the context it was handed.
+[dependencies]
+cybou-protocol = { path = "../cybou-protocol" }
+serde.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

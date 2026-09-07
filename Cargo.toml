@@ -44,6 +44,7 @@ members = [
     "crates/cybou-remediationd",
     "crates/cybou-runtime",
     "crates/cybou-selfd",
+    "crates/cybou-spatial-policy",
     "crates/cybou-storage",
     "crates/cybou-telemetryd",
     "crates/cybou-web-contracts",

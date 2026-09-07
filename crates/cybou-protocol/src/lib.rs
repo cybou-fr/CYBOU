@@ -44,7 +44,7 @@ pub mod terminal;
 
 pub use admission::Kind;
 pub use location::LocationRef;
-pub use subject::{EpistemicPresentation, SubjectQuery, SubjectRef};
+pub use subject::{EpistemicPresentation, SubjectKind, SubjectQuery, SubjectRef};
 
 /// Canonical Qt-compatible UTC wall-clock spelling: whole milliseconds since the Unix epoch.
 ///
