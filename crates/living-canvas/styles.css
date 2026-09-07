@@ -2192,7 +2192,12 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   position: fixed;
   inset: 0;
   background: rgba(4, 8, 14, 0.4);
-  z-index: 95;
+  /* Above the command palette, which sits at 1100 and was drawn straight across the open
+     catalogue -- found by opening it in a browser, because nothing in the tree says what these
+     numbers mean relative to each other. The backdrop covering the palette too is the right
+     outcome: while the launcher is up, a click anywhere else closes it rather than reaching
+     whatever was underneath. */
+  z-index: 1105;
 }
 .launcher {
   position: fixed;
@@ -2210,7 +2215,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   border: 1px solid rgba(154, 167, 184, 0.2);
   border-radius: 16px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
-  z-index: 96;
+  z-index: 1106;
 }
 .launcher-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .launcher-title { color: #dfe8ed; font-size: 13px; font-weight: 500; }
