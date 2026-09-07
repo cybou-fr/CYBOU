@@ -137,6 +137,57 @@ pub fn active_dynamic_relations(
         }
     }
 
+    // 10. Notifications -> Inspector (when notifications reference inspected entity)
+    if layout.contains_card(CardId::Notifications(0)) && layout.contains_card(CardId::Inspector(0)) {
+        let notif_signals = tool_states.notifications(CardId::Notifications(0));
+        let inspector_signals = tool_states.inspector(CardId::Inspector(0));
+        if let Some(target) = inspector_signals.target_subject.get() {
+            if notif_signals.notifications.get().iter().any(|n| n.subject.as_ref() == Some(&target)) {
+                relations.push(DynamicRelation {
+                    from: CardId::Notifications(0),
+                    to: CardId::Inspector(0),
+                    label: "Alerts on",
+                    amber: true,
+                });
+            }
+        }
+    }
+
+    // 11. Operations -> Inspector (when background operations target inspected entity)
+    if layout.contains_card(CardId::Operations(0)) && layout.contains_card(CardId::Inspector(0)) {
+        let op_signals = tool_states.operations(CardId::Operations(0));
+        let inspector_signals = tool_states.inspector(CardId::Inspector(0));
+        if let Some(target) = inspector_signals.target_subject.get() {
+            if op_signals.operations.get().iter().any(|op| op.subject.as_ref() == Some(&target)) {
+                relations.push(DynamicRelation {
+                    from: CardId::Operations(0),
+                    to: CardId::Inspector(0),
+                    label: "Operates on",
+                    amber: false,
+                });
+            }
+        }
+    }
+
+    // 12. Operations -> Services (when background operations mutate services)
+    if layout.contains_card(CardId::Operations(0)) && layout.contains_card(CardId::Services(0)) {
+        let op_signals = tool_states.operations(CardId::Operations(0));
+        if op_signals.operations.get().iter().any(|op| {
+            matches!(
+                op.kind,
+                cybou_protocol::operation::OperationKind::ServiceRestart
+                    | cybou_protocol::operation::OperationKind::ServiceStop
+            )
+        }) {
+            relations.push(DynamicRelation {
+                from: CardId::Operations(0),
+                to: CardId::Services(0),
+                label: "Service Action",
+                amber: false,
+            });
+        }
+    }
+
     relations
 }
 

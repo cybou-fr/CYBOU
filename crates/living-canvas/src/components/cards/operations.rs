@@ -33,6 +33,7 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
     let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.operations(card);
+    let layout = use_context::<RwSignal<crate::DesktopLayout>>();
     let freshness = Freshness::new();
 
     let load_logs = move |id: Uuid| {
@@ -310,6 +311,32 @@ pub fn OperationsContent(card: CardId) -> impl IntoView {
                                             ObservationState::Unavailable => "The executing authority cannot be read right now".to_owned(),
                                         }}
                                     </div>
+
+                                    // Target subject link if present
+                                    {op.subject.as_ref().map(|s| {
+                                        let s_clone = s.clone();
+                                        let title = s.display_title();
+                                        let kind = s.kind_name();
+                                        view! {
+                                            <div style="display: flex; align-items: center; gap: 4px; font-size: 10px; margin-top: 4px;">
+                                                <button
+                                                    class="note-subject-pill"
+                                                    title="Inspect target entity"
+                                                    on:click=move |e| {
+                                                        e.stop_propagation();
+                                                        let inspector_signals = tool_states.inspector(CardId::Inspector(0));
+                                                        inspector_signals.target_subject.set(Some(s_clone.clone()));
+                                                        if let Some(lay) = layout {
+                                                            crate::interaction::spawn_or_focus_card(lay, CardId::Inspector(0), Some(card));
+                                                        }
+                                                    }
+                                                >
+                                                    <lucide_leptos::Layers size=10 />
+                                                    {format!("{kind} » {title}")}
+                                                </button>
+                                            </div>
+                                        }
+                                    })}
 
                                     // Footer actions
                                     <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px;">

@@ -20,6 +20,7 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
     let client = crate::GatewayMindClient;
     let tool_states = expect_context::<ToolCardStates>();
     let signals = tool_states.notifications(card);
+    let layout = use_context::<RwSignal<crate::DesktopLayout>>();
 
     let load_notifications = move || {
         signals.loading.set(true);
@@ -275,14 +276,26 @@ pub fn NotificationsContent(card: CardId) -> impl IntoView {
 
                                 // Subject reference chip if present
                                 {notif.subject.as_ref().map(|s| {
+                                    let s_clone = s.clone();
                                     let title = s.display_title();
                                     let kind = s.kind_name();
                                     view! {
                                         <div style="display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-dim); margin-top: 2px;">
                                             <span>"Subject: "</span>
-                                            <span style="background: var(--fill-subtle); padding: 1px 5px; border-radius: 3px; color: var(--text-second); font-family: monospace;">
+                                            <button
+                                                class="note-subject-pill"
+                                                title="Inspect subject in Universal Inspector"
+                                                on:click=move |_| {
+                                                    let inspector_signals = tool_states.inspector(CardId::Inspector(0));
+                                                    inspector_signals.target_subject.set(Some(s_clone.clone()));
+                                                    if let Some(lay) = layout {
+                                                        crate::interaction::spawn_or_focus_card(lay, CardId::Inspector(0), Some(card));
+                                                    }
+                                                }
+                                            >
+                                                <lucide_leptos::Layers size=10 />
                                                 {format!("{kind} » {title}")}
-                                            </span>
+                                            </button>
                                         </div>
                                     }
                                 })}

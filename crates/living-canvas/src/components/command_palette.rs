@@ -4,7 +4,7 @@
 //! Command palette action launcher and fuzzy navigation menu.
 
 use leptos::prelude::*;
-use lucide_leptos::{Link, ListChecks, Search, Sparkles};
+use lucide_leptos::{Anchor, Box as BoxIcon, FileText, Link, ListChecks, Search, Sparkles};
 use web_sys::KeyboardEvent;
 
 use crate::interaction::usable_viewport;
@@ -547,6 +547,65 @@ fn render_icon(kind: &'static str) -> AnyView {
     }
 }
 
+/// Unified item in the command palette search results.
+#[derive(Clone, Debug, PartialEq)]
+pub enum PaletteEntry {
+    /// Built-in action launcher.
+    Action(PaletteAction),
+    /// Spatial camera landmark / anchor.
+    Anchor {
+        /// Unique anchor identifier.
+        id: String,
+        /// Human-readable label.
+        name: String,
+        /// Center X coordinate in pixels.
+        center_x: f64,
+        /// Center Y coordinate in pixels.
+        center_y: f64,
+        /// Preferred zoom level.
+        preferred_zoom: f64,
+    },
+    /// Semantic panel cluster.
+    Cluster {
+        /// Unique cluster identifier.
+        id: String,
+        /// Human-readable label.
+        label: String,
+        /// Cluster color token.
+        color: String,
+        /// Number of cards in this cluster.
+        card_count: usize,
+    },
+    /// Personal markdown note / knowledge snippet.
+    Note {
+        /// Unique note identifier.
+        id: String,
+        /// Note title.
+        title: String,
+        /// Markdown content snippet.
+        content: String,
+        /// Tag list.
+        tags: Vec<String>,
+        /// Whether note is pinned.
+        is_pinned: bool,
+        /// Referenced system subject.
+        referenced_subject: Option<cybou_protocol::SubjectRef>,
+    },
+}
+
+impl PaletteEntry {
+    /// Unique identifier for keyed list rendering.
+    #[must_use]
+    pub fn key(&self) -> String {
+        match self {
+            Self::Action(a) => format!("action:{}", a.id),
+            Self::Anchor { id, .. } => format!("anchor:{id}"),
+            Self::Cluster { id, .. } => format!("cluster:{id}"),
+            Self::Note { id, .. } => format!("note:{id}"),
+        }
+    }
+}
+
 /// Command palette modal and shortcut launcher.
 #[component]
 pub fn CommandPalette(
@@ -566,28 +625,142 @@ pub fn CommandPalette(
     >,
 ) -> impl IntoView {
     let selected_index = RwSignal::new(0usize);
+    let tool_states = use_context::<crate::tool_state::ToolCardStates>();
 
-    let filtered_actions = Memo::new(move |_| {
+    let filtered_entries = Memo::new(move |_| {
         let q = command_query.get();
-        if q.trim().is_empty() {
-            ALL_PALETTE_ACTIONS.to_vec()
-        } else {
-            ALL_PALETTE_ACTIONS
+        let trimmed = q.trim();
+        if trimmed.is_empty() {
+            return ALL_PALETTE_ACTIONS
                 .iter()
                 .copied()
-                .filter(|action| {
-                    let search_target =
-                        format!("{} {} {}", action.title, action.subtitle, action.keywords);
-                    command_matches(&q, &search_target)
-                })
-                .collect::<Vec<_>>()
+                .map(PaletteEntry::Action)
+                .collect::<Vec<_>>();
         }
+
+        let q_lower = trimmed.to_lowercase();
+        let mut entries = Vec::new();
+
+        // 1. Standard actions
+        for action in ALL_PALETTE_ACTIONS {
+            let search_target = format!("{} {} {}", action.title, action.subtitle, action.keywords);
+            if command_matches(trimmed, &search_target) {
+                entries.push(PaletteEntry::Action(*action));
+            }
+        }
+
+        // 2. Spatial anchors
+        let current_layout = layout.get();
+        for anchor in &current_layout.anchors {
+            let search_target = format!("anchor spatial {} {}", anchor.name, anchor.id);
+            if command_matches(trimmed, &search_target)
+                || anchor.name.to_lowercase().contains(&q_lower)
+            {
+                entries.push(PaletteEntry::Anchor {
+                    id: anchor.id.clone(),
+                    name: anchor.name.clone(),
+                    center_x: anchor.center_x,
+                    center_y: anchor.center_y,
+                    preferred_zoom: anchor.preferred_zoom,
+                });
+            }
+        }
+
+        // 3. Spatial clusters
+        for cluster in &current_layout.clusters {
+            let search_target = format!("cluster group {} {}", cluster.label, cluster.id);
+            if command_matches(trimmed, &search_target)
+                || cluster.label.to_lowercase().contains(&q_lower)
+            {
+                entries.push(PaletteEntry::Cluster {
+                    id: cluster.id.clone(),
+                    label: cluster.label.clone(),
+                    color: cluster.color.clone(),
+                    card_count: cluster.card_keys.len(),
+                });
+            }
+        }
+
+        // 4. Personal notes & ideas
+        if let Some(states) = tool_states {
+            let notes_list = states.notes(CardId::Notes(0)).notes.get();
+            for note in notes_list {
+                let search_target = format!(
+                    "note idea {} {} {}",
+                    note.title,
+                    note.content_markdown,
+                    note.tags.join(" ")
+                );
+                if command_matches(trimmed, &search_target)
+                    || note.title.to_lowercase().contains(&q_lower)
+                {
+                    entries.push(PaletteEntry::Note {
+                        id: note.id,
+                        title: note.title,
+                        content: note.content_markdown,
+                        tags: note.tags,
+                        is_pinned: note.is_pinned,
+                        referenced_subject: note.referenced_subject,
+                    });
+                }
+            }
+        }
+
+        entries
     });
 
     // The camera, so a card opens where this person is looking rather than where the canvas
     // happens to begin. Optional because the palette is mounted in tests without one.
     let camera_pan = use_context::<ReadSignal<(f64, f64)>>();
     let camera_zoom = use_context::<ReadSignal<f64>>();
+    let camera_history = use_context::<RwSignal<crate::layout::camera::CameraHistory>>();
+
+    let fly_to = move |cx: f64, cy: f64, target_zoom: f64| {
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let (Some(pan), Some(zoom)) = (camera_pan, camera_zoom) {
+                crate::apply_camera_fly_to(
+                    camera_history,
+                    pan,
+                    set_pan,
+                    zoom,
+                    set_zoom,
+                    cx,
+                    cy,
+                    target_zoom,
+                );
+            } else {
+                set_pan.set((cx, cy));
+                set_zoom.set(target_zoom);
+            }
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let _ = (camera_history, camera_pan, camera_zoom);
+            set_pan.set((cx, cy));
+            set_zoom.set(target_zoom);
+        }
+    };
+
+    let fit_cluster_and_fly = move |cluster: &crate::layout::DesktopCluster| {
+        let current_layout = layout.get_untracked();
+        if let Some(rect) = current_layout.cluster_rect(cluster) {
+            let (w, h) = (
+                web_sys::window()
+                    .and_then(|w| w.inner_width().ok())
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(1440.0),
+                web_sys::window()
+                    .and_then(|w| w.inner_height().ok())
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(900.0),
+            );
+            let (target_zoom, _) = DesktopLayout::fit_to_viewport(rect, w, h, 60.0);
+            let cx = rect.x + rect.width / 2.0;
+            let cy = rect.y + rect.height / 2.0;
+            fly_to(cx, cy, target_zoom.clamp(0.6, 1.2));
+        }
+    };
 
     let focus_or_open_card = move |card: CardId| {
         set_selected.set(Some(DesktopItemId::Card(card)));
@@ -605,6 +778,20 @@ pub fn CommandPalette(
         }
         layout.update(|l| l.bring_forward(card));
         layout.get_untracked().save();
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Some(camera) = use_context::<crate::components::camera_context::CanvasCamera>() {
+                let geom = layout.get_untracked().geometry(card);
+                if !camera.shows(geom) {
+                    let cx = geom.x + geom.width / 2.0;
+                    let cy = geom.y + geom.height / 2.0;
+                    let target_z = camera_zoom.map_or(1.0, |z| z.get_untracked()).clamp(0.7, 1.2);
+                    fly_to(cx, cy, target_z);
+                }
+            }
+        }
+
         set_command_open.set(false);
         set_command_query.set(String::new());
     };
@@ -724,6 +911,62 @@ pub fn CommandPalette(
         }
     };
 
+    let execute_entry = move |entry: PaletteEntry| match entry {
+        PaletteEntry::Action(action) => execute_action(action.id),
+        PaletteEntry::Anchor {
+            center_x,
+            center_y,
+            preferred_zoom,
+            ..
+        } => {
+            fly_to(center_x, center_y, preferred_zoom);
+            set_command_open.set(false);
+            set_command_query.set(String::new());
+        }
+        PaletteEntry::Cluster { id, .. } => {
+            let current_layout = layout.get_untracked();
+            if let Some(cluster) = current_layout.clusters.iter().find(|c| c.id == id) {
+                fit_cluster_and_fly(cluster);
+            }
+            set_command_open.set(false);
+            set_command_query.set(String::new());
+        }
+        PaletteEntry::Note {
+            id,
+            title,
+            content,
+            tags,
+            is_pinned,
+            referenced_subject,
+        } => {
+            if let Some(states) = tool_states {
+                let notes_signals = states.notes(CardId::Notes(0));
+                notes_signals.selected_note_id.set(Some(id));
+                notes_signals.edit_title.set(title);
+                notes_signals.edit_content.set(content);
+                notes_signals.edit_tags.set(tags.join(", "));
+                notes_signals.edit_pinned.set(is_pinned);
+                notes_signals.edit_referenced_subject.set(referenced_subject);
+            }
+            focus_or_open_card(CardId::Notes(0));
+        }
+    };
+
+    Effect::new(move |_| {
+        if command_open.get() {
+            if let Some(states) = tool_states {
+                let notes_sig = states.notes(CardId::Notes(0));
+                if notes_sig.notes.get_untracked().is_empty() {
+                    leptos::task::spawn_local(async move {
+                        if let Ok(proj) = crate::GatewayMindClient.get_notes().await {
+                            notes_sig.notes.set(proj.notes);
+                        }
+                    });
+                }
+            }
+        }
+    });
+
     let ask_answer = move || crate::state::ask_cybou(&command_query.get(), &runtime.get());
 
     let (meaning_result, set_meaning_result) = signal(Option::<cybou_web_contracts::MeaningInterpretProjection>::None);
@@ -837,35 +1080,81 @@ pub fn CommandPalette(
                     }}
 
                     <Show
-                        when=move || !filtered_actions.get().is_empty()
+                        when=move || !filtered_entries.get().is_empty()
                         fallback=move || view! {
                             <div class="command-empty-state">
-                                <span>"No matching actions found."</span>
-                                <small>"Try searching for 'editor', 'shell', 'arrange', or 'agents'."</small>
+                                <span>"No matching actions, anchors, clusters, or notes found."</span>
+                                <small>"Try searching for 'editor', 'anchor', 'cluster', or notes keywords."</small>
                             </div>
                         }
                     >
                         <For
-                            each=move || filtered_actions.get().into_iter().enumerate()
-                            key=|(_, action)| action.id
-                            children=move |(idx, action)| {
-                                let action_id = action.id;
+                            each=move || filtered_entries.get().into_iter().enumerate()
+                            key=|(_, entry)| entry.key()
+                            children=move |(idx, entry)| {
+                                let entry_click = entry.clone();
                                 let is_active = move || selected_index.get() == idx;
+                                let icon_view = match &entry {
+                                    PaletteEntry::Action(action) => render_icon(action.icon_kind),
+                                    PaletteEntry::Anchor { .. } => view! { <Anchor size=15 /> }.into_any(),
+                                    PaletteEntry::Cluster { .. } => view! { <BoxIcon size=15 /> }.into_any(),
+                                    PaletteEntry::Note { .. } => view! { <FileText size=15 /> }.into_any(),
+                                };
+                                let title_view = match &entry {
+                                    PaletteEntry::Action(action) => action.title.to_string(),
+                                    PaletteEntry::Anchor { name, .. } => format!("Anchor: {name}"),
+                                    PaletteEntry::Cluster { label, .. } => format!("Cluster: {label}"),
+                                    PaletteEntry::Note { title, is_pinned, .. } => {
+                                        if *is_pinned { format!("📌 {title}") } else { title.clone() }
+                                    }
+                                };
+                                let subtitle_view = match &entry {
+                                    PaletteEntry::Action(action) => action.subtitle.to_string(),
+                                    PaletteEntry::Anchor { preferred_zoom, .. } => {
+                                        format!("Spatial camera landmark (zoom {:.1}x)", preferred_zoom)
+                                    }
+                                    PaletteEntry::Cluster { card_count, .. } => {
+                                        format!("{} panel{} in spatial group", card_count, if *card_count == 1 { "" } else { "s" })
+                                    }
+                                    PaletteEntry::Note { content, tags, referenced_subject, .. } => {
+                                        let first_line = content.lines().next().unwrap_or("").trim();
+                                        if let Some(sub) = referenced_subject {
+                                            format!("Ref: {} » {} | {}", sub.kind_name(), sub.display_title(), first_line)
+                                        } else if !tags.is_empty() {
+                                            format!("[{}] {}", tags.join(", "), first_line)
+                                        } else {
+                                            first_line.to_string()
+                                        }
+                                    }
+                                };
+                                let chip_view = match &entry {
+                                    PaletteEntry::Action(action) => action.shortcut.map(|sc| view! {
+                                        <kbd class="command-shortcut-chip">{sc}</kbd>
+                                    }),
+                                    PaletteEntry::Anchor { .. } => Some(view! {
+                                        <kbd class="command-shortcut-chip">"Anchor"</kbd>
+                                    }),
+                                    PaletteEntry::Cluster { .. } => Some(view! {
+                                        <kbd class="command-shortcut-chip">"Cluster"</kbd>
+                                    }),
+                                    PaletteEntry::Note { .. } => Some(view! {
+                                        <kbd class="command-shortcut-chip">"Note"</kbd>
+                                    }),
+                                };
+
                                 view! {
                                     <button
                                         type="button"
                                         class:active=is_active
-                                        on:click=move |_| execute_action(action_id)
+                                        on:click=move |_| execute_entry(entry_click.clone())
                                         on:mouseenter=move |_| selected_index.set(idx)
                                     >
-                                        {render_icon(action.icon_kind)}
+                                        {icon_view}
                                         <span>
-                                            <b>{action.title}</b>
-                                            <i>{action.subtitle}</i>
+                                            <b>{title_view}</b>
+                                            <i>{subtitle_view}</i>
                                         </span>
-                                        {action.shortcut.map(|sc| view! {
-                                            <kbd class="command-shortcut-chip">{sc}</kbd>
-                                        })}
+                                        {chip_view}
                                     </button>
                                 }
                             }
@@ -879,7 +1168,7 @@ pub fn CommandPalette(
                 <input
                     node_ref=command_input
                     type="search"
-                    placeholder="Search or act… (↑↓ to navigate, Enter to run)"
+                    placeholder="Search tools, anchors, clusters, notes… (↑↓ to navigate, Enter to run)"
                     prop:value=move || command_query.get()
                     on:focus=move |_| set_command_open.set(true)
                     on:input=move |event| {
@@ -890,22 +1179,22 @@ pub fn CommandPalette(
                         let key = event.key();
                         if key == "ArrowDown" {
                             event.prevent_default();
-                            let len = filtered_actions.get().len();
+                            let len = filtered_entries.get().len();
                             if len > 0 {
                                 selected_index.update(|i| *i = (*i + 1) % len);
                             }
                         } else if key == "ArrowUp" {
                             event.prevent_default();
-                            let len = filtered_actions.get().len();
+                            let len = filtered_entries.get().len();
                             if len > 0 {
                                 selected_index.update(|i| *i = if *i == 0 { len - 1 } else { *i - 1 });
                             }
                         } else if key == "Enter" {
                             event.prevent_default();
-                            let actions = filtered_actions.get();
+                            let entries = filtered_entries.get();
                             let idx = selected_index.get();
-                            if let Some(action) = actions.get(idx) {
-                                execute_action(action.id);
+                            if let Some(entry) = entries.get(idx) {
+                                execute_entry(entry.clone());
                             } else if let Some(ans) = ask_answer()
                                 && let Some((_, card)) = ans.target {
                                     focus_or_open_card(card);
@@ -926,3 +1215,59 @@ pub fn CommandPalette(
         </section>
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn palette_entry_keys_are_distinct_and_deterministic() {
+        let action = PaletteEntry::Action(ALL_PALETTE_ACTIONS[0]);
+        let anchor = PaletteEntry::Anchor {
+            id: "anc-1".to_string(),
+            name: "Home View".to_string(),
+            center_x: 100.0,
+            center_y: 200.0,
+            preferred_zoom: 1.0,
+        };
+        let cluster = PaletteEntry::Cluster {
+            id: "cls-1".to_string(),
+            label: "Production".to_string(),
+            color: "cyan".to_string(),
+            card_count: 3,
+        };
+        let note = PaletteEntry::Note {
+            id: "note-1".to_string(),
+            title: "Architecture notes".to_string(),
+            content: "Detailed markdown content".to_string(),
+            tags: vec!["design".to_string()],
+            is_pinned: false,
+            referenced_subject: None,
+        };
+
+        assert_eq!(action.key(), "action:files");
+        assert_eq!(anchor.key(), "anchor:anc-1");
+        assert_eq!(cluster.key(), "cluster:cls-1");
+        assert_eq!(note.key(), "note:note-1");
+    }
+
+    #[test]
+    fn universal_search_matches_anchors_and_clusters() {
+        let q = "infra";
+        let cluster_label = "Infrastructure Cluster";
+        assert!(cluster_label.to_lowercase().contains(q) || command_matches(q, cluster_label));
+
+        let q_anc = "camera";
+        let anchor_text = "anchor spatial camera view";
+        assert!(command_matches(q_anc, anchor_text));
+    }
+
+    #[test]
+    fn universal_search_matches_notes_content_and_tags() {
+        let note_tags = vec!["critical".to_string(), "database".to_string()];
+        let note_text = format!("note idea Postgres crash details {}", note_tags.join(" "));
+        assert!(command_matches("postgres", &note_text));
+        assert!(command_matches("database", &note_text));
+    }
+}
+
