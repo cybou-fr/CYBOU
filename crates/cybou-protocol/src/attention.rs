@@ -13,7 +13,10 @@
 
 use serde::{Deserialize, Serialize};
 
+use uuid::Uuid;
+
 use crate::epistemic::EpistemicStatus;
+use crate::subject::SubjectQuery;
 
 /// A concept asking to be noticed.
 ///
@@ -74,4 +77,55 @@ pub struct Admission {
 /// The default for [`Admission::upstream_complete`] when a record predates the field.
 const fn everything_was_offered() -> bool {
     true
+}
+
+/// What a reader of a contribution could make of the thing that contribution is about.
+///
+/// The three arms are three different facts and none of them substitutes for another. A payload
+/// nothing here can parse is not a contribution about nothing, and a subject key that names no
+/// entity kind is not an entity: presenting either as an openable subject would put something on
+/// the desktop that no organ ever observed, which is the failure this enum exists to prevent.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "reading", content = "subject", rename_all = "kebab-case")]
+pub enum SubjectReading {
+    /// The payload named a subject key that classifies into an entity lookup.
+    ///
+    /// A [`SubjectQuery`] rather than a `SubjectRef`, deliberately: a key read out of a journal
+    /// payload is evidence that something was mentioned, not evidence that it is there now, and
+    /// only an owner can turn the one into the other.
+    Classified(SubjectQuery),
+    /// The payload named a subject key that classifies into no entity kind.
+    ///
+    /// Worth carrying rather than dropping: `operating-system` is displayable and un-openable, and
+    /// a reader that saw nothing here could not tell it from a payload it failed to read.
+    Uninterpreted(String),
+    /// The payload was not in a shape this reader knows, so it names nothing.
+    Unread,
+}
+
+/// One contribution in the coalition that holds attention, and what it is about.
+///
+/// Named here rather than in `workspaced` for the reason the rest of this module gives: what an
+/// organ decided gets dropped at the first boundary it crosses unless every layer shares the
+/// spelling. Until this existed the only thing that survived the trip to a desktop was the
+/// coalition's correlation identity — a UUID, which tells a person nothing about what their machine
+/// is attending to.
+///
+/// Carrying it moves no authority. `workspaced` still decides what holds attention; this says only
+/// what the contributions it chose were about.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttendedSubject {
+    /// Identity of the contribution this was read from.
+    pub contribution: Uuid,
+    /// The organ that wrote it.
+    pub organ: String,
+    /// The frozen numeric contribution kind, left numeric so no layer has to agree on a spelling.
+    pub kind: u16,
+    /// The confidence the contribution carried.
+    pub confidence: f64,
+    /// The evidence the contribution cited, in the order it cited it.
+    pub evidence: Vec<Uuid>,
+    /// What the payload said this contribution is about.
+    pub reading: SubjectReading,
 }

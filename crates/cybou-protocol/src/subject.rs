@@ -73,6 +73,33 @@ impl SubjectQuery {
             | Self::Process(value) => value,
         }
     }
+
+    /// Classify a namespaced observation subject key into a lookup request.
+    ///
+    /// The keys organs write into their payloads are free text, and most of them name no entity at
+    /// all: `operating-system` is a subject a reader can display and nothing a reader can open. So
+    /// this recognises only the `kind/identifier` spelling and returns `None` for everything else,
+    /// rather than guessing that an unprefixed key is a unit name. A [`SubjectQuery`] is what comes
+    /// back for the same reason it exists: a key found in a journal payload is evidence that
+    /// something was mentioned, never evidence that it is there now.
+    #[must_use]
+    pub fn from_subject_key(key: &str) -> Option<Self> {
+        let (kind, identifier) = key.split_once('/')?;
+        if identifier.is_empty() || identifier.chars().any(|ch| ch.is_control() || ch == '/') {
+            return None;
+        }
+        let identifier = identifier.to_owned();
+        match kind {
+            "service" => Some(Self::Service(identifier)),
+            "file" => Some(Self::File(identifier)),
+            "agent" => Some(Self::Agent(identifier)),
+            "package" => Some(Self::Package(identifier)),
+            "anchor" => Some(Self::Anchor(identifier)),
+            "operation" => Some(Self::Operation(identifier)),
+            "process" => Some(Self::Process(identifier)),
+            _ => None,
+        }
+    }
 }
 
 fn encoded_segment(value: &str) -> String {
@@ -431,6 +458,26 @@ mod tests {
         let agent = SubjectQuery::Agent("candidate-capsule".to_string());
         assert_eq!(agent.kind_name(), "Agent query");
         assert_eq!(agent.identifier(), "candidate-capsule");
+    }
+
+    #[test]
+    fn a_subject_key_becomes_a_query_only_when_it_names_a_kind() {
+        assert_eq!(
+            SubjectQuery::from_subject_key("service/nginx.service"),
+            Some(SubjectQuery::Service("nginx.service".to_string()))
+        );
+        assert_eq!(
+            SubjectQuery::from_subject_key("process/1234"),
+            Some(SubjectQuery::Process("1234".to_string()))
+        );
+        // The keys the perception sources write today name no entity. Turning one into a service
+        // query would put a unit on the desktop that nothing ever observed.
+        assert_eq!(SubjectQuery::from_subject_key("operating-system"), None);
+        assert_eq!(SubjectQuery::from_subject_key("current-system"), None);
+        assert_eq!(SubjectQuery::from_subject_key("weather/tomorrow"), None);
+        assert_eq!(SubjectQuery::from_subject_key("service/"), None);
+        assert_eq!(SubjectQuery::from_subject_key("service/a/b"), None);
+        assert_eq!(SubjectQuery::from_subject_key("service/a\u{7}b"), None);
     }
 
     #[test]

@@ -288,7 +288,8 @@
         "knowledge",
         "focus",
         "salience",
-        "organs"
+        "organs",
+        "subjects"
       ],
       "properties": {
         "knowledge": {
@@ -313,6 +314,110 @@
           "type": "array",
           "items": {
             "type": "string"
+          }
+        },
+        "subjects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "contribution",
+              "organ",
+              "kind",
+              "confidence",
+              "evidence",
+              "reading"
+            ],
+            "properties": {
+              "contribution": {
+                "type": "string"
+              },
+              "organ": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "reading": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "reading",
+                      "subject"
+                    ],
+                    "properties": {
+                      "reading": {
+                        "const": "classified"
+                      },
+                      "subject": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "identifier"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "service",
+                              "file",
+                              "agent",
+                              "package",
+                              "anchor",
+                              "operation",
+                              "process"
+                            ]
+                          },
+                          "identifier": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "reading",
+                      "subject"
+                    ],
+                    "properties": {
+                      "reading": {
+                        "const": "uninterpreted"
+                      },
+                      "subject": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "reading"
+                    ],
+                    "properties": {
+                      "reading": {
+                        "const": "unread"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
           }
         }
       }

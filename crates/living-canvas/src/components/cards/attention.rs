@@ -4,6 +4,8 @@
 //! Attention card and content component representing Workspace1 Global Workspace Theory attention focus.
 
 use cybou_protocol::KnowledgeState;
+use cybou_protocol::attention::SubjectReading;
+use cybou_web_contracts::AttendedSubjectProjection;
 use leptos::prelude::*;
 use lucide_leptos::Map;
 use std::sync::Arc;
@@ -14,6 +16,29 @@ use crate::{
     interaction::{DragState, ResizeState},
     state::{RuntimeState, unread},
 };
+
+/// What one attended contribution is about, as a line a person can read.
+///
+/// The three readings stay three lines. A payload this build could not parse is shown as exactly
+/// that rather than folded into "no subject", because the two look identical on screen and only one
+/// of them is a claim about the machine.
+fn subject_label(subject: &AttendedSubjectProjection) -> (String, String) {
+    match &subject.reading {
+        SubjectReading::Classified(query) => {
+            (query.kind_name().to_owned(), query.identifier().to_owned())
+        }
+        SubjectReading::Uninterpreted(key) => ("Subject".to_owned(), key.clone()),
+        SubjectReading::Unread => (subject.kind.clone(), "payload not read".to_owned()),
+    }
+}
+
+/// The subjects of the focused coalition, or an explanation of why there are none.
+fn attended_subjects(
+    mind: Option<cybou_web_contracts::MindProjection>,
+) -> Vec<AttendedSubjectProjection> {
+    mind.filter(|m| m.attention.knowledge == KnowledgeState::Known)
+        .map_or_else(Vec::new, |m| m.attention.subjects)
+}
 
 /// Attention domain content presentation.
 #[component]
@@ -49,12 +74,32 @@ pub fn AttentionContent(runtime: RwSignal<RuntimeState>) -> impl IntoView {
         }
     };
 
+    let subjects = move || attended_subjects(mind());
+
     view! {
         <div class="attention-card-body">
             <strong>"Attention"</strong>
             <span class="attention-focus">{attention_focus}</span>
             <span class="row"><b>"Salience"</b><i>{attention_salience}</i></span>
             <span class="row"><b>"Organs"</b><i>{attention_organs}</i></span>
+            <Show when=move || !subjects().is_empty()>
+                <span class="heading-label">"About"</span>
+                <div class="attention-subjects">
+                    {move || subjects()
+                        .into_iter()
+                        .map(|subject| {
+                            let (kind, label) = subject_label(&subject);
+                            let organ = subject.organ.clone();
+                            view! {
+                                <span class="row attention-subject">
+                                    <b>{label}</b>
+                                    <i>{kind}" · "{organ}</i>
+                                </span>
+                            }
+                        })
+                        .collect_view()}
+                </div>
+            </Show>
         </div>
     }
 }
@@ -86,7 +131,11 @@ pub fn AttentionCard(
     };
 
     let collapsed = move || {
-        let focus = attention_focus();
+        // A person scanning a collapsed card wants what their machine is attending to, and a
+        // correlation UUID is not that. The identity stays available in the open card.
+        let focus = attended_subjects(mind())
+            .first()
+            .map_or_else(attention_focus, |subject| subject_label(subject).1);
         view! {
             <div class="card-collapsed-summary">
                 <b>"Attention"</b>

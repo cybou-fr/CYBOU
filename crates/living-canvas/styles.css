@@ -752,6 +752,9 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .insight-said { margin-top: 4px; font-size: 10px; }
 .insight-said summary { color: var(--accent); cursor: pointer; }
 .insight-said pre { margin: 6px 0 0; padding: 8px; border-radius: 6px; background: rgba(0,0,0,.22); color: var(--muted); font-size: 10px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.attention-subjects { display: grid; gap: 3px; margin-left: 8px; }
+/* The label is the thing itself and gets the room; what read it is secondary and may be clipped. */
+.attention-subject b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .attention-focus { padding: 8px 10px; border: 1px solid rgba(112,225,200,.28); border-radius: 8px; color: var(--accent); font-size: 11px; word-break: break-all; }
 .row, .check-row { display: flex; justify-content: space-between; gap: 20px; font-size: 12px; font-style: normal; }
 .row b, .check-row b { color: #dfe8ed; font-weight: 500; }

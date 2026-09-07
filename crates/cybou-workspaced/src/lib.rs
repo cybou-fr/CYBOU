@@ -12,7 +12,12 @@ use std::{
     sync::RwLock,
 };
 
-use cybou_protocol::{Kind, canonical::CanonicalEnvelope, unix_millis};
+use cybou_protocol::{
+    Kind, SubjectQuery,
+    attention::{AttendedSubject, SubjectReading},
+    canonical::CanonicalEnvelope,
+    unix_millis,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use time::OffsetDateTime;
@@ -45,6 +50,42 @@ pub fn attention_weight_u16(kind_u16: u16) -> f64 {
     Kind::from_u16(kind_u16).map_or(0.5, attention_weight)
 }
 
+/// How many contributions of a focused coalition are described to a reader outside this organ.
+///
+/// A coalition is bounded by the moment's capacity, so this is not protection against a flood. It
+/// is protection against a different thing: a reader that renders one row per contribution and
+/// silently draws thirty. Whoever reads the moment can still ask for the coalition itself.
+const ATTENDED_SUBJECT_LIMIT: usize = 8;
+
+/// Read what a contribution is about out of its payload, without guessing.
+///
+/// Payloads are CBOR whose shape belongs to the kind, and this reader knows exactly one convention:
+/// a map with a text `subject`. Everything else reads as [`SubjectReading::Unread`] rather than as
+/// an absence of subject, because the two are different facts and only the first is this reader's
+/// own limitation. Nothing here is decrypted: a sealed payload is bytes, and bytes that do not
+/// parse say so.
+#[must_use]
+pub fn read_subject(payload: &[u8]) -> SubjectReading {
+    let Ok(value) = ciborium::from_reader::<ciborium::Value, _>(payload) else {
+        return SubjectReading::Unread;
+    };
+    let Some(entries) = value.as_map() else {
+        return SubjectReading::Unread;
+    };
+    let key = entries.iter().find_map(|(name, value)| {
+        (name.as_text() == Some("subject"))
+            .then(|| value.as_text())
+            .flatten()
+    });
+    let Some(key) = key.filter(|key| !key.trim().is_empty()) else {
+        return SubjectReading::Unread;
+    };
+    SubjectQuery::from_subject_key(key).map_or_else(
+        || SubjectReading::Uninterpreted(key.to_owned()),
+        SubjectReading::Classified,
+    )
+}
+
 /// A cluster of related cognitive contributions competing for conscious workspace focus.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -73,6 +114,29 @@ impl Coalition {
     pub fn is_valid(&self) -> bool {
         !self.correlation_id.is_nil() && !self.members.is_empty()
     }
+
+    /// What the contributions in this coalition are about, newest first.
+    ///
+    /// Newest first because a coalition is an episode and its latest contribution is the one a
+    /// reader is most likely to be looking at. Contributions whose payload says nothing are kept
+    /// rather than filtered: dropping them would let a reader count the rows and conclude the
+    /// episode was smaller than it was.
+    #[must_use]
+    pub fn attended_subjects(&self) -> Vec<AttendedSubject> {
+        self.members
+            .iter()
+            .rev()
+            .take(ATTENDED_SUBJECT_LIMIT)
+            .map(|member| AttendedSubject {
+                contribution: member.message_id,
+                organ: member.origin_organ.clone(),
+                kind: member.kind,
+                confidence: member.confidence,
+                evidence: member.evidence.clone(),
+                reading: read_subject(&member.payload),
+            })
+            .collect()
+    }
 }
 
 /// Snapshot of the conscious moment in the workspace.
@@ -85,6 +149,13 @@ pub struct MomentState {
     pub salience: f64,
     /// Organs active in the current focus.
     pub organs: Vec<String>,
+    /// What the contributions holding focus are about, newest first and bounded.
+    ///
+    /// Defaulted so a state written before the field existed still reads: an empty list there means
+    /// the same thing it means anywhere else here, which is that nothing was read, not that the
+    /// coalition was about nothing.
+    #[serde(default)]
+    pub subjects: Vec<AttendedSubject>,
 }
 
 /// Errors occurring in the workspace engine.
@@ -274,12 +345,14 @@ impl WorkspaceCore {
             Some(c) => MomentState {
                 focus: Some(c.correlation_id),
                 salience: c.salience,
+                subjects: c.attended_subjects(),
                 organs: c.organs,
             },
             None => MomentState {
                 focus: None,
                 salience: 0.0,
                 organs: vec![],
+                subjects: vec![],
             },
         }
     }
@@ -323,6 +396,124 @@ mod tests {
             retain_until_ms: 0,
             sensitivity: 1,
         }
+    }
+
+    fn payload_naming(subject: &str) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        ciborium::into_writer(
+            &ciborium::Value::Map(vec![(
+                ciborium::Value::Text("subject".to_string()),
+                ciborium::Value::Text(subject.to_string()),
+            )]),
+            &mut bytes,
+        )
+        .expect("encode payload");
+        bytes
+    }
+
+    #[test]
+    fn a_payload_that_names_nothing_is_not_a_contribution_about_nothing() {
+        // Three different facts, and the point of the test is that they stay three.
+        assert_eq!(read_subject(&[]), SubjectReading::Unread);
+        assert_eq!(read_subject(b"not cbor at all"), SubjectReading::Unread);
+        assert_eq!(
+            read_subject(&payload_naming("operating-system")),
+            SubjectReading::Uninterpreted("operating-system".to_string())
+        );
+        assert_eq!(
+            read_subject(&payload_naming("service/nginx.service")),
+            SubjectReading::Classified(SubjectQuery::Service("nginx.service".to_string()))
+        );
+    }
+
+    #[test]
+    fn what_holds_attention_travels_with_what_it_is_about() {
+        let core = WorkspaceCore::new(32);
+        let now = OffsetDateTime::now_utc();
+        let now_ms = unix_millis(now);
+        let correlation = Uuid::from_u128(7);
+
+        let mut older = make_envelope(
+            Uuid::from_u128(1),
+            correlation,
+            "perceptiond",
+            1,
+            0.9,
+            now_ms - 1000,
+        );
+        older.payload = payload_naming("service/nginx.service");
+        older.evidence = vec![Uuid::from_u128(99)];
+        let mut newer = make_envelope(Uuid::from_u128(2), correlation, "insightd", 1, 0.8, now_ms);
+        newer.payload = payload_naming("operating-system");
+        core.accept(older);
+        core.accept(newer);
+
+        let state = core.moment_state(now);
+        assert_eq!(state.focus, Some(correlation));
+        // Newest first, and nothing dropped for being unreadable or unclassifiable.
+        assert_eq!(state.subjects.len(), 2);
+        assert_eq!(state.subjects[0].organ, "insightd");
+        assert_eq!(
+            state.subjects[0].reading,
+            SubjectReading::Uninterpreted("operating-system".to_string())
+        );
+        assert_eq!(state.subjects[1].organ, "perceptiond");
+        assert_eq!(
+            state.subjects[1].reading,
+            SubjectReading::Classified(SubjectQuery::Service("nginx.service".to_string()))
+        );
+        // The evidence the contribution cited travels with it, so a reader can go and look.
+        assert_eq!(state.subjects[1].evidence, vec![Uuid::from_u128(99)]);
+        assert_eq!(state.subjects[1].contribution, Uuid::from_u128(1));
+    }
+
+    #[test]
+    fn a_reader_of_the_moment_is_told_about_a_bounded_number_of_contributions() {
+        let core = WorkspaceCore::new(32);
+        let now = OffsetDateTime::now_utc();
+        let now_ms = unix_millis(now);
+        let correlation = Uuid::from_u128(11);
+        for index in 0..20u128 {
+            let mut envelope = make_envelope(
+                Uuid::from_u128(index + 1),
+                correlation,
+                "perceptiond",
+                1,
+                0.5,
+                now_ms - i64::try_from(index).expect("small index"),
+            );
+            envelope.payload = payload_naming("operating-system");
+            core.accept(envelope);
+        }
+        assert_eq!(
+            core.moment_state(now).subjects.len(),
+            ATTENDED_SUBJECT_LIMIT
+        );
+    }
+
+    #[test]
+    fn a_moment_written_before_subjects_existed_still_reads() {
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct OlderMomentState {
+            focus: Option<Uuid>,
+            salience: f64,
+            organs: Vec<String>,
+        }
+        let mut bytes = Vec::new();
+        ciborium::into_writer(
+            &OlderMomentState {
+                focus: Some(Uuid::from_u128(3)),
+                salience: 0.75,
+                organs: vec!["perceptiond".to_string()],
+            },
+            &mut bytes,
+        )
+        .expect("encode older state");
+        let decoded: MomentState =
+            ciborium::from_reader(bytes.as_slice()).expect("older state still reads");
+        assert_eq!(decoded.focus, Some(Uuid::from_u128(3)));
+        assert!(decoded.subjects.is_empty());
     }
 
     #[test]

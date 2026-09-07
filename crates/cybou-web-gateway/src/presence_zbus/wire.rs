@@ -77,6 +77,30 @@ pub(super) struct OwnerMomentState {
     pub(super) focus: Option<uuid::Uuid>,
     pub(super) salience: f64,
     pub(super) organs: Vec<String>,
+    /// What the contributions holding focus are about.
+    ///
+    /// Defaulted so a Workspace1 that predates the field is read rather than rejected: an organ
+    /// that has not been restarted yet is not an organ that failed to answer.
+    #[serde(default)]
+    pub(super) subjects: Vec<cybou_protocol::attention::AttendedSubject>,
+}
+
+/// Convert one attended contribution into the spelling the browser contract uses.
+pub(super) fn attended_subject(
+    subject: cybou_protocol::attention::AttendedSubject,
+) -> cybou_web_contracts::AttendedSubjectProjection {
+    cybou_web_contracts::AttendedSubjectProjection {
+        contribution: subject.contribution.to_string(),
+        organ: subject.organ,
+        kind: kind_name(subject.kind),
+        confidence: subject.confidence,
+        evidence: subject
+            .evidence
+            .into_iter()
+            .map(|id| id.to_string())
+            .collect(),
+        reading: subject.reading,
+    }
 }
 
 /// Epistemic1's belief row.

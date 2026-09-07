@@ -12,7 +12,7 @@ use super::ZbusPresenceSource;
 use super::wire::{
     OwnerBelief, OwnerConcept, OwnerIntention, OwnerLifecycle, OwnerMomentState,
     OwnerPerceptionState, OwnerSelfReport, OwnerVerification, PERSONAL, RECENT_CONTRIBUTIONS,
-    kind_name, millis_to_rfc3339,
+    attended_subject, kind_name, millis_to_rfc3339,
 };
 use cybou_fabric::{
     ACTION, CONTEXT, EPISTEMIC, EVENT, EXECUTOR, IDENTITY, INTENTION, LIFECYCLE, PERCEPTION, SELF,
@@ -275,12 +275,7 @@ impl ZbusPresenceSource {
 
     pub(super) async fn attention(&self) -> AttentionProjection {
         let Some(encoded) = self.read::<Vec<u8>>(WORKSPACE, "MomentState").await else {
-            return AttentionProjection {
-                knowledge: KnowledgeState::Unknown,
-                focus: None,
-                salience: None,
-                organs: Vec::new(),
-            };
+            return unread_attention();
         };
         match ciborium::from_reader::<OwnerMomentState, _>(encoded.as_slice()) {
             // Workspace1 answering with no focus is knowledge, not absence: nothing currently
@@ -290,13 +285,9 @@ impl ZbusPresenceSource {
                 focus: state.focus.map(|id| id.to_string()),
                 salience: Some(state.salience),
                 organs: state.organs,
+                subjects: state.subjects.into_iter().map(attended_subject).collect(),
             },
-            Err(_) => AttentionProjection {
-                knowledge: KnowledgeState::Unknown,
-                focus: None,
-                salience: None,
-                organs: Vec::new(),
-            },
+            Err(_) => unread_attention(),
         }
     }
 
@@ -670,5 +661,16 @@ pub fn project_action_record(
                 observation_after: None,
                 concluded_at: o.concluded_at.format(&Rfc3339).unwrap_or_default(),
             }),
+    }
+}
+
+/// What a reader is told when Workspace1 did not answer, or answered unreadably.
+fn unread_attention() -> AttentionProjection {
+    AttentionProjection {
+        knowledge: KnowledgeState::Unknown,
+        focus: None,
+        salience: None,
+        organs: Vec::new(),
+        subjects: Vec::new(),
     }
 }

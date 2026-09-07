@@ -3,6 +3,7 @@
 
 //! Explicit versioned contract between Living Canvas and `cybou-web-gateway`.
 
+use cybou_protocol::attention::SubjectReading;
 use cybou_protocol::{CapabilityState, KnowledgeState, LocationRef, SchemaVersion};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -535,6 +536,30 @@ pub struct SelfProjection {
     pub settled_predictions: Option<u32>,
 }
 
+/// One contribution in the coalition that holds attention, and what it is about.
+///
+/// The browser mirror of `cybou_protocol::attention::AttendedSubject`: identities become strings at
+/// this boundary like every other identity in this contract, and the numeric contribution kind
+/// becomes the name the rest of the projection uses. The reading is carried through unchanged,
+/// because collapsing "nothing was read" into "no subject" here would hand the desktop a confident
+/// absence the organ never claimed.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttendedSubjectProjection {
+    /// Identity of the contribution this was read from.
+    pub contribution: String,
+    /// The organ that wrote it.
+    pub organ: String,
+    /// The contribution kind in the spelling the journal projection uses.
+    pub kind: String,
+    /// The confidence the contribution carried.
+    pub confidence: f64,
+    /// The evidence the contribution cited, in the order it cited it.
+    pub evidence: Vec<String>,
+    /// What the payload said this contribution is about.
+    pub reading: SubjectReading,
+}
+
 /// What currently holds attention, as reported by Workspace1.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -547,6 +572,13 @@ pub struct AttentionProjection {
     pub salience: Option<f64>,
     /// Organs participating in it.
     pub organs: Vec<String>,
+    /// What the contributions holding focus are about, newest first and bounded by Workspace1.
+    ///
+    /// Empty is not "attending to nothing": it is what a desktop sees when the focus coalition's
+    /// payloads said nothing this reader understands, or when Workspace1 answered without them.
+    /// The correlation identity in `focus` remains the only thing that is always there.
+    #[serde(default)]
+    pub subjects: Vec<AttendedSubjectProjection>,
 }
 
 /// One belief as Epistemic1 holds it.
@@ -1972,7 +2004,8 @@ pub struct GovernanceScopesProjection {
 #[cfg(test)]
 mod tests {
     use super::{
-        CommitmentsProjection, FileContentProjection, LocationRef, MindProjection, SessionMode,
+        AttendedSubjectProjection, AttentionProjection, CommitmentsProjection,
+        FileContentProjection, KnowledgeState, LocationRef, MindProjection, SessionMode,
         SessionProjection, SnapshotProjection, WEB_SCHEMA_V1,
     };
 
@@ -2815,5 +2848,40 @@ mod tests {
         let dec_scopes: GovernanceScopesProjection =
             serde_json::from_str(&enc_scopes).expect("deserialize scopes");
         assert_eq!(dec_scopes, scopes);
+    }
+
+    #[test]
+    fn attention_carries_what_the_moment_is_about_and_survives_its_absence() {
+        use cybou_protocol::SubjectQuery;
+        use cybou_protocol::attention::SubjectReading;
+
+        let projection = AttentionProjection {
+            knowledge: KnowledgeState::Known,
+            focus: Some("2f1c9d3e-0000-4000-8000-000000000001".to_string()),
+            salience: Some(0.75),
+            organs: vec!["perceptiond".to_string()],
+            subjects: vec![AttendedSubjectProjection {
+                contribution: "2f1c9d3e-0000-4000-8000-000000000002".to_string(),
+                organ: "perceptiond".to_string(),
+                kind: "observation".to_string(),
+                confidence: 0.9,
+                evidence: vec!["2f1c9d3e-0000-4000-8000-000000000003".to_string()],
+                reading: SubjectReading::Classified(SubjectQuery::Service(
+                    "nginx.service".to_string(),
+                )),
+            }],
+        };
+        let encoded = serde_json::to_string(&projection).expect("serialize attention");
+        let decoded: AttentionProjection =
+            serde_json::from_str(&encoded).expect("deserialize attention");
+        assert_eq!(decoded, projection);
+
+        // A gateway that has not shipped the field yet still produces a readable projection, and
+        // the desktop sees an empty list rather than a parse failure.
+        let older: AttentionProjection = serde_json::from_str(
+            r#"{"knowledge":"known","focus":null,"salience":0.5,"organs":[]}"#,
+        )
+        .expect("older attention still reads");
+        assert!(older.subjects.is_empty());
     }
 }

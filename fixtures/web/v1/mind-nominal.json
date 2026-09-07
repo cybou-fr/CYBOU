@@ -61,6 +61,35 @@
     "organs": [
       "perceptiond",
       "identityd"
+    ],
+    "subjects": [
+      {
+        "contribution": "1c9d3e2f-0000-4000-8000-000000000002",
+        "organ": "perceptiond",
+        "kind": "observation",
+        "confidence": 0.9,
+        "evidence": [
+          "1c9d3e2f-0000-4000-8000-000000000003"
+        ],
+        "reading": {
+          "reading": "classified",
+          "subject": {
+            "kind": "service",
+            "identifier": "nginx.service"
+          }
+        }
+      },
+      {
+        "contribution": "1c9d3e2f-0000-4000-8000-000000000004",
+        "organ": "identityd",
+        "kind": "observation",
+        "confidence": 0.7,
+        "evidence": [],
+        "reading": {
+          "reading": "uninterpreted",
+          "subject": "operating-system"
+        }
+      }
     ]
   },
   "beliefs": {
