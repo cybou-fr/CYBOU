@@ -1,14 +1,21 @@
 // SPDX-FileCopyrightText: 2026 Cybou contributors
 // SPDX-License-Identifier: MIT
 
-//! Legacy schema version 8 types and migration pathways into version 9.
+//! Legacy schema types and the migration pathways into the version this build writes.
 
 use serde::{Deserialize, Serialize};
 
 use crate::card::{CardGeometry, CardId, CardInstance, CardPresentation};
 use crate::layout::engine::DesktopLayout;
 
-/// Desktop layout schema version 9 storage key in browser `localStorage`.
+/// Desktop layout schema version 10 storage key in browser `localStorage`.
+pub const LAYOUT_KEY_V10: &str = "cybou.desktop.layout.v10";
+
+/// Legacy layout schema version 9 storage key.
+///
+/// Still read, never written. A person who opens an older build after this one finds the desktop
+/// they left there rather than an empty canvas, which is the whole reason the old key is not
+/// cleared on migration.
 pub const LAYOUT_KEY_V9: &str = "cybou.desktop.layout.v9";
 
 /// Legacy layout schema version 8 storage key.

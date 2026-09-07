@@ -10,7 +10,7 @@
 use super::DesktopLayout;
 
 #[cfg(target_arch = "wasm32")]
-use crate::layout::migration::{CanvasLayoutV8, LAYOUT_KEY_V8, LAYOUT_KEY_V9};
+use crate::layout::migration::{CanvasLayoutV8, LAYOUT_KEY_V8, LAYOUT_KEY_V9, LAYOUT_KEY_V10};
 
 #[cfg(target_arch = "wasm32")]
 impl DesktopLayout {
@@ -24,16 +24,28 @@ impl DesktopLayout {
             return def;
         };
 
-        // 1. Try v9 key first
-        if let Ok(Some(v9_str)) = storage.get_item(LAYOUT_KEY_V9)
-            && let Ok(mut v9) = serde_json::from_str::<Self>(&v9_str)
-            && v9.schema_version == 9
+        // 1. Try the current key first
+        if let Ok(Some(current)) = storage.get_item(LAYOUT_KEY_V10)
+            && let Some(mut layout) = Self::parse_json(&current)
         {
-            v9.validate_and_normalize();
-            return v9;
+            layout.validate_and_normalize();
+            return layout;
         }
 
-        // 2. Try legacy v8 key
+        // 2. Then the desktop this person left under the previous version. Migrated and saved
+        // under the new key, and the old one deliberately left where it is: an older build opened
+        // afterwards should find their arrangement rather than a blank canvas.
+        if let Ok(Some(v9_str)) = storage.get_item(LAYOUT_KEY_V9)
+            && let Ok(v9) = serde_json::from_str::<Self>(&v9_str)
+            && v9.schema_version == 9
+        {
+            let mut migrated = Self::from_v9(v9);
+            migrated.validate_and_normalize();
+            migrated.save();
+            return migrated;
+        }
+
+        // 3. Try legacy v8 key
         if let Ok(Some(v8_str)) = storage.get_item(LAYOUT_KEY_V8)
             && let Ok(v8) = serde_json::from_str::<CanvasLayoutV8>(&v8_str)
         {
@@ -53,13 +65,13 @@ impl DesktopLayout {
         default_layout
     }
 
-    /// Save current layout to browser `localStorage` under `cybou.desktop.layout.v9`.
+    /// Save current layout to browser `localStorage` under `cybou.desktop.layout.v10`.
     pub fn save(&self) {
         let storage = web_sys::window().and_then(|w| w.local_storage().ok().flatten());
         if let Some(storage) = storage
             && let Ok(serialized) = serde_json::to_string(self)
         {
-            let _ = storage.set_item(LAYOUT_KEY_V9, &serialized);
+            let _ = storage.set_item(LAYOUT_KEY_V10, &serialized);
         }
     }
 }

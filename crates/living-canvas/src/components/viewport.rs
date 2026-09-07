@@ -301,6 +301,22 @@ pub fn CanvasViewport(
                     let cluster_id = cluster.id.clone();
                     let color = cluster.color.clone();
                     let label = cluster.label.clone();
+                    // Only a cluster the desktop offered carries the control that takes it away.
+                    // A person's own grouping has no such button here on purpose: theirs is not
+                    // the desktop's to tidy, and a button that looked the same on both would make
+                    // dismissing an offer and deleting their work the same gesture.
+                    let offered = cluster.origin.is_suggested();
+                    let dismiss_id = cluster.id.clone();
+                    // Held as a callback rather than a closure: the block below is re-run every
+                    // time the cluster's rectangle changes, and a plain closure would be moved out
+                    // of on the first draw.
+                    let dismiss = Callback::new(move |ev: leptos::ev::MouseEvent| {
+                        ev.stop_propagation();
+                        layout.update(|l| {
+                            l.dismiss_suggested_cluster(&dismiss_id);
+                        });
+                        layout.get_untracked().save();
+                    });
                     let get_rect = move || {
                         let current_layout = layout.get();
                         current_layout
@@ -320,6 +336,15 @@ pub fn CanvasViewport(
                                     <div class=format!("canvas-cluster theme-{}", color) style=style>
                                         <div class="canvas-cluster-header">
                                             <span class="canvas-cluster-title">{label.clone()}</span>
+                                            <Show when=move || offered>
+                                                <button
+                                                    class="canvas-cluster-dismiss"
+                                                    title="Stop grouping these; the cards stay where they are"
+                                                    on:click=move |ev| dismiss.run(ev)
+                                                >
+                                                    "\u{00d7}"
+                                                </button>
+                                            </Show>
                                         </div>
                                     </div>
                                 }.into_any()

@@ -204,17 +204,19 @@ Every visible surface implements `CardInstance`:
 - `CardPresentation`: Display mode flags (`collapsed: bool`, `pinned: bool`).
 - `CardSpec`: Static contract defining `kind` (`System`, `Tool`, `Ephemeral`), capabilities (`movable`, `resizable`, `collapsible`, `closable`, `deckable`), and size constraints (`default_size`, `min_size`, `max_size`).
 
-#### Layout Schema v9, Self-Healing Normalization and Migration
+#### Layout Schema v10, Self-Healing Normalization and Migration
 
-Layout persistence uses schema version 9 (`cybou.desktop.layout.v9`):
-1. Loads `cybou.desktop.layout.v9` if present in browser `localStorage`.
-2. Falls back to legacy schema v8 (`cybou.living-canvas.layout.v8`), migrating all fixed point positions into full `CardGeometry` with default spec dimensions, uncollapsed, unpinned presentation.
-3. Transparently runs `validate_and_normalize()` on boot:
+Layout persistence uses schema version 10 (`cybou.desktop.layout.v10`):
+1. Loads `cybou.desktop.layout.v10` if present in browser `localStorage`.
+2. Falls back to schema v9 (`cybou.desktop.layout.v9`), which differs by one field: `DesktopCluster.origin`. A v9 cluster reads as `ClusterOrigin::Person`, because every cluster written before the field existed was written by somebody, and the desktop may only remove clusters it offered itself. The v9 key is read and never written, and is deliberately not cleared, so an older build opened afterwards still finds an arrangement.
+3. Falls back to legacy schema v8 (`cybou.living-canvas.layout.v8`), migrating all fixed point positions into full `CardGeometry` with default spec dimensions, uncollapsed, unpinned presentation.
+4. Transparently runs `validate_and_normalize()` on boot:
    - **System Cards Guarantee**: Instantiates defaults if any of the 11 Mind system cards are missing from storage.
    - **Bounds & Anchors Clamping**: Clamps dimensions to `[min_size, max_size]` and bounds offsets to reachable coordinates.
    - **Deck Resolution**: Deduplicates cards, dissolves single-card or corrupt decks, and enforces multi-deck exclusivity.
    - **Monotonic Z-Ordering**: Re-indexes z-order monotonically starting from 1.
-4. Commits verified state without breaking user coordinates or disrupting active sessions.
+   - **Offered Cluster Expiry**: Clears a `ClusterOrigin::Suggested` cluster once none of its cards remain. A person's own cluster is left exactly as it is, empty or not.
+5. Commits verified state without breaking user coordinates or disrupting active sessions.
 
 #### Spatial Dynamics, Compositor Invariants (L1–L15), and Invariant-Safe Decks
 

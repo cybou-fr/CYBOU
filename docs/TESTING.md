@@ -297,7 +297,7 @@ bash scripts/test-desktop-gate.sh
 
 This gate runs 5 sequential verification stages covering the frontend and capability boundaries:
 
-1. **Desktop and Living Canvas unit tests**: Verifies `DesktopLayout` v8-to-v9 migration, spatial geometry clamping, layout undo/redo history, and automatic self-healing normalization (`validate_and_normalize`) that recovers missing system cards and dissolves corrupt decks.
+1. **Desktop and Living Canvas unit tests**: Verifies `DesktopLayout` v8 and v9 migration into the current schema, cluster origin surviving that migration as the person's, spatial geometry clamping, layout undo/redo history, and automatic self-healing normalization (`validate_and_normalize`) that recovers missing system cards and dissolves corrupt decks.
 2. **Invariant-safe Deck model**: Verifies `DeckError` enforcement, preventing single-card decks, duplicate cards, and multi-deck conflicts.
 3. **Terminal ownership**: The sandboxed shell this stage used to cover is gone, and with it the demonstration builtins it enforced. What replaced it is a real PTY owned by the authenticated Linux account (`cybou-ptyd@<uid>`), proven by `scripts/test-terminal-gate.sh` on a deployed host rather than here: a terminal that runs programs as a person is not something a unit test can stand in for.
 4. **Web Gateway security boundaries**: Verifies that Public Preview mode strictly forbids shell access (HTTP 403) and serves only safe read-only projections.

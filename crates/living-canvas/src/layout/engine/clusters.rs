@@ -3,9 +3,11 @@
 
 //! Cluster computation and manipulation engine for Living Canvas.
 
+use uuid::Uuid;
+
 use crate::{
-    DesktopLayout,
-    layout::model::{DesktopCluster, Rect},
+    CardId, DesktopLayout,
+    layout::model::{ClusterOrigin, DesktopCluster, Rect},
 };
 
 impl DesktopLayout {
@@ -27,6 +29,42 @@ impl DesktopLayout {
     /// Remove a cluster by ID.
     pub fn remove_cluster(&mut self, id: &str) {
         self.clusters.retain(|c| c.id != id);
+    }
+
+    /// Gather cards the desktop offered into one cluster for the episode they belong to.
+    ///
+    /// Marked [`ClusterOrigin::Suggested`] so it can be taken away again when the episode is over.
+    /// The identity is derived from the episode rather than generated, so a second offer about the
+    /// same one replaces this cluster instead of stacking another beside it — and so that two runs
+    /// of the same accept produce the same layout.
+    pub fn gather_suggested(&mut self, correlation: Option<Uuid>, label: &str, cards: &[CardId]) {
+        let card_keys: Vec<String> = cards.iter().map(|card| card.instance_key()).collect();
+        if card_keys.is_empty() {
+            return;
+        }
+        self.add_cluster(DesktopCluster {
+            id: suggested_cluster_id(correlation, &card_keys),
+            label: label.to_owned(),
+            color: "amber".to_owned(),
+            card_keys,
+            origin: ClusterOrigin::Suggested { correlation },
+        });
+    }
+
+    /// Take away a cluster the desktop offered, leaving its cards exactly where they are.
+    ///
+    /// Answers `false` for a cluster a person built, which is the point of the whole origin field:
+    /// dismissing an offer must never be a way to delete somebody's own grouping, however alike the
+    /// two look on screen.
+    pub fn dismiss_suggested_cluster(&mut self, id: &str) -> bool {
+        let removable = self
+            .clusters
+            .iter()
+            .any(|cluster| cluster.id == id && cluster.origin.is_suggested());
+        if removable {
+            self.remove_cluster(id);
+        }
+        removable
     }
 
     /// Compute the 2D bounding hull rectangle of a cluster including padding.
@@ -89,4 +127,17 @@ impl DesktopLayout {
             (max_y - min_y) + pad_top + pad_bottom,
         ))
     }
+}
+
+/// The identity of the cluster offered for an episode.
+///
+/// An episode names it where there is one. Where there is not, the cards do: an offer with no
+/// correlation still has to be the same cluster when it is made twice, and a generated identity
+/// would leave a second copy of it behind every time.
+#[must_use]
+pub fn suggested_cluster_id(correlation: Option<Uuid>, card_keys: &[String]) -> String {
+    correlation.map_or_else(
+        || format!("suggested:cards:{}", card_keys.join("+")),
+        |correlation| format!("suggested:{correlation}"),
+    )
 }

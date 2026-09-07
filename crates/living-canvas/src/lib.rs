@@ -58,10 +58,10 @@ pub use deck::DeckInstance;
 pub use gateway_client::GatewayMindClient;
 pub use instant::{instant_label, time_label};
 pub use layout::{
-    ArrangementMode, CameraHistory, CameraState, CanvasAnchor, DesktopCluster, DesktopItem,
-    DesktopItemId, DesktopLayout, DesktopViewMode, LayoutHistory, MINIMAP_HEIGHT, MINIMAP_PADDING,
-    MINIMAP_WIDTH, MinimapProjection, PlacementResolver, Rect, SnapGuide, SnapResult,
-    UsableViewport, pan_centring, selected_rect, selected_z, visible_desktop_rect,
+    ArrangementMode, CameraHistory, CameraState, CanvasAnchor, ClusterOrigin, DesktopCluster,
+    DesktopItem, DesktopItemId, DesktopLayout, DesktopViewMode, LayoutHistory, MINIMAP_HEIGHT,
+    MINIMAP_PADDING, MINIMAP_WIDTH, MinimapProjection, PlacementResolver, Rect, SnapGuide,
+    SnapResult, UsableViewport, pan_centring, selected_rect, selected_z, visible_desktop_rect,
 };
 #[cfg(target_arch = "wasm32")]
 pub use layout::{apply_camera_back, apply_camera_fly_to, apply_camera_forward, camera_center};

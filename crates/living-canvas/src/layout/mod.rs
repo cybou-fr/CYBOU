@@ -17,16 +17,18 @@ pub mod snap;
 pub use camera::{CameraHistory, CameraState};
 #[cfg(target_arch = "wasm32")]
 pub use camera::{apply_camera_back, apply_camera_fly_to, apply_camera_forward, camera_center};
-pub use engine::DesktopLayout;
+pub use engine::{DesktopLayout, LAYOUT_SCHEMA_VERSION};
 pub use history::LayoutHistory;
-pub use migration::{CanvasLayoutV8, LAYOUT_KEY_V8, LAYOUT_KEY_V9, PointV8, from_v8};
+pub use migration::{
+    CanvasLayoutV8, LAYOUT_KEY_V8, LAYOUT_KEY_V9, LAYOUT_KEY_V10, PointV8, from_v8,
+};
 pub use minimap::{
     MINIMAP_HEIGHT, MINIMAP_PADDING, MINIMAP_WIDTH, MinimapProjection, pan_centring,
     visible_desktop_rect,
 };
 pub use model::{
-    ArrangementMode, CanvasAnchor, DesktopCluster, DesktopItem, DesktopItemId, DesktopViewMode,
-    Rect, UsableViewport,
+    ArrangementMode, CanvasAnchor, ClusterOrigin, DesktopCluster, DesktopItem, DesktopItemId,
+    DesktopViewMode, Rect, UsableViewport,
 };
 pub use placement::PlacementResolver;
 pub use relations::{DesktopRelationshipGraph, RelationVisibility, Relationship, RelationshipKind};
@@ -45,7 +47,9 @@ mod tests {
         let v8 = CanvasLayoutV8::default();
         let v9 = DesktopLayout::from_v8(&v8);
 
-        assert_eq!(v9.schema_version, 9);
+        // Stamped with whatever this build writes: the v8 conversion produces a current layout,
+        // not a v9 one that some later step has to find and bump again.
+        assert_eq!(v9.schema_version, LAYOUT_SCHEMA_VERSION);
         // Eleven, because that is how many panels v8 had. Migration carries what the old layout
         // held and invents nothing; a card added after v8 is the business of normalization, which
         // this test deliberately does not run.
@@ -71,7 +75,7 @@ mod tests {
         // five while the desktop drew fourteen. A test that calls a different function from the one
         // the product calls is a test of nothing in particular.
         let layout = DesktopLayout::load();
-        assert_eq!(layout.schema_version, 9);
+        assert_eq!(layout.schema_version, LAYOUT_SCHEMA_VERSION);
 
         let expected = [
             CardId::Identity,
@@ -390,6 +394,7 @@ mod tests {
             label: "Workspaces".into(),
             color: "cyan".into(),
             card_keys: vec!["editor".into(), "identity".into()],
+            origin: ClusterOrigin::Person,
         });
 
         layout.validate_and_normalize();
@@ -577,13 +582,116 @@ mod tests {
     fn parse_json_supports_both_schemas() {
         let v8_json = serde_json::to_string(&CanvasLayoutV8::default()).unwrap();
         let layout_v8 = DesktopLayout::parse_json(&v8_json).expect("parses v8");
-        assert_eq!(layout_v8.schema_version, 9);
+        assert_eq!(layout_v8.schema_version, LAYOUT_SCHEMA_VERSION);
         // Eleven for the same reason as above: this is what v8 carried, not what v9 requires.
         assert_eq!(layout_v8.cards.len(), 11);
 
-        let v9_json = serde_json::to_string(&DesktopLayout::default()).unwrap();
-        let layout_v9 = DesktopLayout::parse_json(&v9_json).expect("parses v9");
-        assert_eq!(layout_v9.schema_version, 9);
+        let current_json = serde_json::to_string(&DesktopLayout::default()).unwrap();
+        let current = DesktopLayout::parse_json(&current_json).expect("parses the current schema");
+        assert_eq!(current.schema_version, LAYOUT_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn a_cluster_somebody_built_before_origin_existed_is_still_theirs() {
+        // The one thing the v9 to v10 migration must not get wrong. A cluster written before the
+        // field existed was written by a person, and reading it as suggested would hand the
+        // desktop permission to delete their work the moment its cards were closed.
+        let mut v9 = DesktopLayout::default();
+        v9.schema_version = 9;
+        v9.clusters.push(DesktopCluster {
+            id: "mine".into(),
+            label: "Mine".into(),
+            color: "cyan".into(),
+            card_keys: vec!["identity".into()],
+            origin: ClusterOrigin::Person,
+        });
+        let mut raw = serde_json::to_value(&v9).expect("serialize v9");
+        raw["clusters"][0]
+            .as_object_mut()
+            .expect("a cluster object")
+            .remove("origin");
+        let json = serde_json::to_string(&raw).expect("v9 json without origin");
+
+        let migrated = DesktopLayout::parse_json(&json).expect("parses v9");
+        assert_eq!(migrated.schema_version, LAYOUT_SCHEMA_VERSION);
+        assert_eq!(migrated.clusters[0].origin, ClusterOrigin::Person);
+    }
+
+    #[test]
+    fn dismissing_an_offer_takes_away_the_grouping_and_leaves_every_card_where_it_is() {
+        let mut layout = DesktopLayout::default();
+        layout.open_card(CardId::Services(0), 100.0, 100.0);
+        layout.open_card(CardId::Processes(0), 500.0, 100.0);
+        let episode = uuid::Uuid::from_u128(42);
+        layout.gather_suggested(
+            Some(episode),
+            "nginx.service, 1234",
+            &[CardId::Services(0), CardId::Processes(0)],
+        );
+        assert_eq!(layout.clusters.len(), 1);
+
+        // Offered twice about the same episode is still one cluster, not two stacked on each other.
+        layout.gather_suggested(Some(episode), "nginx.service", &[CardId::Services(0)]);
+        assert_eq!(layout.clusters.len(), 1);
+
+        let id = layout.clusters[0].id.clone();
+        assert!(layout.dismiss_suggested_cluster(&id));
+        assert!(layout.clusters.is_empty());
+        // The cards are the person's and the grouping was not. Dismissing one must not touch them.
+        assert!(layout.contains_card(CardId::Services(0)));
+        assert!(layout.contains_card(CardId::Processes(0)));
+        let geometry = layout.geometry(CardId::Processes(0));
+        assert!((geometry.x - 500.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn the_desktop_cannot_dismiss_a_grouping_somebody_built() {
+        let mut layout = DesktopLayout::default();
+        layout.clusters.push(DesktopCluster {
+            id: "mine".into(),
+            label: "Mine".into(),
+            color: "cyan".into(),
+            card_keys: vec!["identity".into()],
+            origin: ClusterOrigin::Person,
+        });
+        assert!(!layout.dismiss_suggested_cluster("mine"));
+        assert_eq!(layout.clusters.len(), 1);
+    }
+
+    #[test]
+    fn an_offered_cluster_is_cleared_once_its_cards_are_gone_and_a_persons_is_not() {
+        let mut layout = DesktopLayout::default();
+        layout.clusters.push(DesktopCluster {
+            id: "mine".into(),
+            label: "Mine".into(),
+            color: "cyan".into(),
+            card_keys: vec!["services:0".into()],
+            origin: ClusterOrigin::Person,
+        });
+        layout.clusters.push(DesktopCluster {
+            id: "offered".into(),
+            label: "Offered".into(),
+            color: "amber".into(),
+            card_keys: vec!["services:0".into()],
+            origin: ClusterOrigin::Suggested {
+                correlation: Some(uuid::Uuid::from_u128(42)),
+            },
+        });
+
+        // While the cards are there, both stand.
+        layout.open_card(CardId::Services(0), 100.0, 100.0);
+        layout.validate_and_normalize();
+        assert_eq!(layout.clusters.len(), 2);
+
+        // Once they are gone, the offer is residue and the person's cluster is still theirs.
+        layout.close_card(CardId::Services(0));
+        layout.validate_and_normalize();
+        let ids: Vec<&str> = layout
+            .clusters
+            .iter()
+            .map(|cluster| cluster.id.as_str())
+            .collect();
+        assert_eq!(ids, ["mine"]);
     }
 
     #[test]

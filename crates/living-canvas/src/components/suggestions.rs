@@ -97,6 +97,15 @@ pub fn AttentionSuggestions(runtime: RwSignal<RuntimeState>) -> impl IntoView {
                     layout.update(|layout| layout.open_card_near(*card, beside, viewport));
                     beside = Some(*card);
                 }
+                // A gathered set is one thing the person accepted, so it is drawn as one thing.
+                // Marked as offered rather than built, which is what makes it removable later
+                // without the desktop ever being able to take away a grouping of their own.
+                if let SpatialSuggestion::Gather { why, .. } = &suggestion {
+                    let label = suggestion_label(&suggestion);
+                    layout.update(|layout| {
+                        layout.gather_suggested(why.correlation, &label, &cards);
+                    });
+                }
                 if let (Some(card), Some(set_selected)) = (cards.first(), set_selected) {
                     set_selected.set(Some(DesktopItemId::Card(*card)));
                 }

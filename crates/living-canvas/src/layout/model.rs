@@ -4,6 +4,7 @@
 //! Core 2D geometry models, viewports, and item identifiers for Living Canvas.
 
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::card::{CardGeometry, CardId, CardPresentation};
 
@@ -170,6 +171,19 @@ pub enum DesktopViewMode {
 pub struct DesktopCluster {
     /// Unique cluster identifier.
     pub id: String,
+    /// Who put this cluster on the canvas.
+    ///
+    /// The distinction the desktop cannot work without once it starts suggesting groupings. A
+    /// cluster the desktop offered may be taken away again when the episode is over; a cluster a
+    /// person built is theirs, and nothing here may close it. Without this field the two are the
+    /// same shape, and the only safe behaviour for a temporary cluster is never to remove it —
+    /// which is how a canvas fills up with the residue of things that finished hours ago.
+    ///
+    /// Defaulted to [`ClusterOrigin::Person`] on purpose: every cluster written before this
+    /// existed was written by somebody, and a migration that guessed otherwise would hand the
+    /// desktop permission to delete their work.
+    #[serde(default)]
+    pub origin: ClusterOrigin,
     /// Human-readable label / title.
     pub label: String,
     /// Color theme or accent (e.g. "cyan", "purple", "amber", "emerald").
@@ -178,6 +192,31 @@ pub struct DesktopCluster {
     /// Associated card identifiers in this cluster.
     #[serde(default)]
     pub card_keys: Vec<String>,
+}
+
+/// Who put a cluster on the canvas.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(tag = "origin", rename_all = "kebab-case")]
+pub enum ClusterOrigin {
+    /// A person made it, and only a person may unmake it.
+    #[default]
+    Person,
+    /// The desktop offered it and a person accepted, for one episode.
+    Suggested {
+        /// The episode it was offered for, when one was named.
+        ///
+        /// Carried so a second offer about the same episode replaces the cluster rather than
+        /// stacking another one beside it.
+        correlation: Option<Uuid>,
+    },
+}
+
+impl ClusterOrigin {
+    /// Whether the desktop may remove this cluster on its own.
+    #[must_use]
+    pub const fn is_suggested(&self) -> bool {
+        matches!(self, Self::Suggested { .. })
+    }
 }
 
 fn default_cluster_color() -> String {

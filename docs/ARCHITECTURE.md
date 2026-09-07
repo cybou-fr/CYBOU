@@ -328,7 +328,7 @@ graph TD
 
 CYBOU Desktop establishes:
 - **Generic Cards**: Every surface is a `CardInstance` governed by a static `CardSpec`.
-- **Layout v9 Schema**: Persisted spatial positions with transparent migration from legacy v8.
+- **Layout v10 Schema**: Persisted spatial positions, and whether a cluster was built by a person or offered by the desktop, with transparent migration from v9 and legacy v8.
 - **Spatial Dynamics**: Real-time bounded resize, collapse/expand pills, pinning, and deterministic multi-mode arrangement (`Free`, `Compact`, `Grid`, `Relations`, `Focus`).
 - **Bounded Body Capabilities**: A real terminal owned by the authenticated Linux account through `cybou-ptyd@<uid>`, enabled per account by an operator and refused in public preview. The sandboxed shell that stood here is gone: it answered six builtins inside a demonstration root and called itself a shell, which is the confusion this system refuses in the other direction.
 

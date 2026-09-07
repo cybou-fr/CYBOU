@@ -2535,6 +2535,19 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   gap: 6px;
   pointer-events: auto;
 }
+
+/* Only an offered cluster has one of these. Deliberately quiet: it takes away a grouping the
+   desktop proposed and leaves every card exactly where it is. */
+.canvas-cluster-dismiss {
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.canvas-cluster-dismiss:hover { color: #dfe8ed; }
 .canvas-cluster-title {
   font-size: 12px;
   font-weight: 600;

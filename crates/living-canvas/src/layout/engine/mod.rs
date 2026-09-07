@@ -24,10 +24,10 @@ mod clusters;
 mod decks;
 mod persistence;
 
-/// Persistent Desktop layout (schema version 9).
+/// Persistent Desktop layout (schema version 10).
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct DesktopLayout {
-    /// Schema version, currently 9.
+    /// Schema version, currently 10.
     pub schema_version: u32,
     /// Ordered list of card instances.
     pub cards: Vec<CardInstance>,
@@ -57,6 +57,13 @@ pub struct DesktopLayout {
 /// guard against nonsense, not a fence.
 const CANVAS_REACH: f64 = 100_000.0;
 
+/// The schema this build writes.
+///
+/// Ten differs from nine by one field on a cluster, which serde defaults. That is why the migration
+/// below is a version stamp rather than a conversion: a v9 layout is already readable, and the only
+/// thing that has to change is what the desktop says it is.
+pub const LAYOUT_SCHEMA_VERSION: u32 = 10;
+
 impl Default for DesktopLayout {
     fn default() -> Self {
         Self::canonical(None)
@@ -64,11 +71,11 @@ impl Default for DesktopLayout {
 }
 
 impl DesktopLayout {
-    /// Construct a new empty layout with schema version 9.
+    /// Construct a new empty layout with schema version 10.
     #[must_use]
     pub const fn new() -> Self {
         Self {
-            schema_version: 9,
+            schema_version: LAYOUT_SCHEMA_VERSION,
             cards: Vec::new(),
             decks: Vec::new(),
             clusters: Vec::new(),
@@ -428,6 +435,19 @@ impl DesktopLayout {
             cluster.card_keys = normalized_keys;
         }
 
+        // 5b. A cluster the desktop offered is only as alive as the cards it gathered. Once they
+        // are all gone it is residue, and clearing it is the whole reason origin exists: a person's
+        // own cluster is left exactly where it is, empty or not, because it is not the desktop's to
+        // tidy.
+        let cards = self.cards.clone();
+        self.clusters.retain(|cluster| {
+            !cluster.origin.is_suggested()
+                || cluster
+                    .card_keys
+                    .iter()
+                    .any(|key| cards.iter().any(|card| card.id.matches_persisted_key(key)))
+        });
+
         // 6. Normalize canvas anchors
         let mut anchor_ids = std::collections::HashSet::new();
         let mut anchor_names = std::collections::HashSet::new();
@@ -468,13 +488,30 @@ impl DesktopLayout {
         }
     }
 
-    /// Parse layout from raw JSON string, supporting both v9 and v8 formats.
+    /// Take a layout saved as v9 and call it what it now is.
+    ///
+    /// Nothing is converted. The one field v10 adds defaults to [`ClusterOrigin::Person`], which is
+    /// the truth about every cluster written before this version: somebody made it. Guessing
+    /// otherwise would hand the desktop permission to delete their work.
+    #[must_use]
+    pub fn from_v9(mut v9: Self) -> Self {
+        v9.schema_version = LAYOUT_SCHEMA_VERSION;
+        for cluster in &mut v9.clusters {
+            cluster.origin = crate::layout::model::ClusterOrigin::Person;
+        }
+        v9
+    }
+
+    /// Parse layout from raw JSON string, supporting the v10, v9 and v8 formats.
     #[must_use]
     pub fn parse_json(json: &str) -> Option<Self> {
-        if let Ok(v9) = serde_json::from_str::<Self>(json)
-            && v9.schema_version == 9
-        {
-            return Some(v9);
+        if let Ok(current) = serde_json::from_str::<Self>(json) {
+            if current.schema_version == LAYOUT_SCHEMA_VERSION {
+                return Some(current);
+            }
+            if current.schema_version == 9 {
+                return Some(Self::from_v9(current));
+            }
         }
         if let Ok(v8) = serde_json::from_str::<CanvasLayoutV8>(json) {
             return Some(Self::from_v8(&v8));
