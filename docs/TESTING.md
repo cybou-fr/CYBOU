@@ -295,17 +295,21 @@ account outside the group is refused, and `usermod -L` closes the door.
 bash scripts/test-desktop-gate.sh
 ```
 
-This gate runs 5 sequential verification stages covering the frontend and capability boundaries:
+This gate runs 4 sequential verification stages covering the frontend and capability boundaries.
+Every one of them is also a step of `scripts/gate.sh`; the script is the standalone form, for
+working on the desktop without paying for the whole gate:
 
 1. **Desktop and Living Canvas unit tests**: Verifies `DesktopLayout` v8 and v9 migration into the current schema, cluster origin surviving that migration as the person's, spatial geometry clamping, layout undo/redo history, and automatic self-healing normalization (`validate_and_normalize`) that recovers missing system cards and dissolves corrupt decks.
 2. **Invariant-safe Deck model**: Verifies `DeckError` enforcement, preventing single-card decks, duplicate cards, and multi-deck conflicts.
-3. **Terminal ownership**: The sandboxed shell this stage used to cover is gone, and with it the demonstration builtins it enforced. What replaced it is a real PTY owned by the authenticated Linux account (`cybou-ptyd@<uid>`), proven by `scripts/test-terminal-gate.sh` on a deployed host rather than here: a terminal that runs programs as a person is not something a unit test can stand in for.
-4. **Web Gateway security boundaries**: Verifies that Public Preview mode strictly forbids shell access (HTTP 403) and serves only safe read-only projections.
-5. **WASM32 target compilation and workspace Clippy**: Proves clean, zero-warning compilation for the browser runtime.
+3. **Web Gateway security boundaries**: Verifies that Public Preview mode strictly forbids shell access (HTTP 403) and serves only safe read-only projections.
+4. **WASM32 target compilation and workspace Clippy**: Proves the browser runtime compiles, and that everything compiled for the host is warning-free.
+
+The stage that used to sit third covered the sandboxed shell, which is gone, and the script went on calling `cargo test -p cybou-shelld` for a crate that no longer exists — so the gate could not pass, and nothing invoked it. What replaced that stage is a real PTY owned by the authenticated Linux account (`cybou-ptyd@<uid>`), proven by `scripts/test-terminal-gate.sh` on a deployed host rather than here: a terminal that runs programs as a person is not something a unit test can stand in for.
 
 ## What is not covered
 
 - **The native Wayland desktop session manager**, which has no full compositor implementation in this tree yet (Living Canvas currently runs as a browser/PWA and web workstation surface).
+- **Lints on the browser half of the desktop.** `crates/living-canvas/src/components` is compiled only for `wasm32`, so `cargo clippy --workspace` — the step that denies warnings — never sees it. It is compiled and tested for that target, so it cannot be broken, but it is not held to the same lint standard as the rest of the tree: `cargo clippy -p living-canvas --target wasm32-unknown-unknown --all-targets` currently reports 117 warnings, none of them denied by any gate. Adding that step means answering them first.
 
 That is a real gap. It is recorded here rather than left to be inferred from a green run that was
 answering a different question.

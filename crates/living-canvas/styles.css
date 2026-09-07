@@ -760,6 +760,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .attention-suggestion b { color: #dfe8ed; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .attention-suggestion-why { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }
 .attention-suggestion button { padding: 2px 8px; border: 1px solid rgba(154,167,184,.24); border-radius: 6px; background: transparent; color: var(--accent); font-size: 10px; cursor: pointer; }
+/* The two answers, named apart: accepting is the accented one, saying no is quiet. */
+.attention-suggestion-accept { color: var(--accent); }
 .attention-suggestion-dismiss { color: var(--muted) !important; }
 .attention-suggestion button:hover { border-color: rgba(112,225,200,.4); }
 /* The label is the thing itself and gets the room; what read it is secondary and may be clipped. */

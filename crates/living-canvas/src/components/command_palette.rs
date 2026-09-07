@@ -69,7 +69,7 @@ const ALL_PALETTE_ACTIONS: &[PaletteAction] = &[
         id: "files",
         category: PaletteCategory::Tools,
         title: "Open File Manager",
-        subtitle: "Browse and edit safe-shell files",
+        subtitle: "Browse, edit and transfer files",
         keywords: "files file manager storage browse create edit directory breadcrumbs",
         shortcut: None,
         icon_kind: "external",
