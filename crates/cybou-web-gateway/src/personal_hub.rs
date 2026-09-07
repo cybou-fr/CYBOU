@@ -66,8 +66,12 @@ impl PersonalHub {
         #[cfg(target_os = "linux")]
         {
             let candidate = PathBuf::from("/var/lib/cybou/personal-store.sqlite3");
-            if candidate.parent().is_some_and(std::path::Path::exists) {
-                return Some(candidate);
+            if let Some(parent) = candidate.parent() {
+                if parent.exists()
+                    && rustix::fs::access(parent, rustix::fs::Access::WRITE_OK).is_ok()
+                {
+                    return Some(candidate);
+                }
             }
         }
         None

@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn personal_hub_manages_mail_calendar_notes_contacts() {
-        let hub = PersonalHub::new();
+        let hub = PersonalHub::with_optional_store(None);
         let uid = 1000;
 
         // Mail tests
