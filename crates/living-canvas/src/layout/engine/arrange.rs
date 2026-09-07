@@ -386,7 +386,7 @@ impl DesktopLayout {
         let start_x = 40.0;
         let start_y = 40.0;
 
-        let num_cols = if viewport.width >= 1600.0 {
+        let mut num_cols = if viewport.width >= 1600.0 {
             4
         } else if viewport.width >= 1200.0 {
             3
@@ -394,17 +394,39 @@ impl DesktopLayout {
             2
         };
 
+        // The window alone is not enough to decide this. The operator panels are 520 to 560 wide,
+        // where the Mind cards are 220 to 380, and three columns of the former do not fit a window
+        // three columns of the latter fit comfortably — which put a card most of a screen past the
+        // right-hand edge on a first visit, with nothing saying so. So the count is capped by what
+        // actually has to go in the columns.
+        let widest_card = items
+            .iter()
+            .filter(|item| !item.is_pinned())
+            .map(|item| item.geometry.width)
+            .fold(col_width, f64::max);
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "a column count from a window width, floored and then clamped to at least one"
+        )]
+        let fitting =
+            ((viewport.width - start_x * 2.0 + col_gap) / (widest_card + col_gap)).floor() as usize;
+        num_cols = num_cols.min(fitting.max(1));
+
         // Canonical Home columns
         let home_col = |item: &DesktopItem| -> usize {
             match &item.id {
                 DesktopItemId::Card(id) => match id {
-                    // Disclosure sits beside Session, the other card about who is being answered.
-                    // Insight sits beside Perception: both are about the machine rather than about
-                    // Mind, and a reader looking at one usually wants the other.
+                    // The operator's first two panels lead this column: what the host makes of
+                    // itself and what it is spending. The Mind cards that share it are there for
+                    // the older reason — Disclosure sits beside Session, the other card about who
+                    // is being answered, and Insight beside Perception, both about the machine
+                    // rather than about Mind.
                     CardId::Session
                     | CardId::Identity
                     | CardId::Perception
                     | CardId::Insight
+                    | CardId::Monitor(_)
                     | CardId::Lifecycle
                     | CardId::Disclosure => 0,
                     // Agents sits with Capabilities and Journal: all three are about what this
@@ -415,6 +437,12 @@ impl DesktopLayout {
                     CardId::Commitments | CardId::Context | CardId::Beliefs | CardId::SelfModel => {
                         2 % num_cols
                     }
+                    // The rest of the operator's first screen: what the host is doing, then what
+                    // is waiting for an answer. Without these the map sent all three to the last
+                    // column, which stacked them one under another and ran the bottom one below
+                    // the dock.
+                    CardId::Operations(_) => 1 % num_cols,
+                    CardId::Notifications(_) => 2 % num_cols,
                     _ => num_cols - 1,
                 },
                 DesktopItemId::Deck(_) => 1 % num_cols,
@@ -560,7 +588,7 @@ mod tests {
         let layout = DesktopLayout::canonical(Some(viewport));
         assert_eq!(
             layout.cards.len(),
-            5,
+            4,
             "every card the first desktop opens with is still on it"
         );
         for card in &layout.cards {
@@ -574,7 +602,7 @@ mod tests {
             layout
                 .cards
                 .iter()
-                .any(|card| card.id == CardId::Identity && card.geometry.y > 0.0),
+                .any(|card| card.id == CardId::Monitor(0) && card.geometry.y > 0.0),
             "the arrangement still ran"
         );
     }

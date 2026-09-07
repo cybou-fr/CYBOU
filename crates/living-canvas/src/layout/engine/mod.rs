@@ -86,25 +86,28 @@ impl DesktopLayout {
 
     /// Construct the Desktop layout a person meets on their first visit.
     ///
-    /// Five cards rather than all fourteen. The other nine are not gone and were never optional to
-    /// build: every one of them is one click away in the Dock, in the command palette, and in
-    /// [`CardId::ALL_SYSTEM_CARDS`], which is still what the desktop is checked against. What
-    /// changed is what happens before anybody has chosen anything. Fourteen panels of unfamiliar
-    /// vocabulary opening at once is not a demonstration of what this host knows about itself; it
-    /// is a wall, and the first thing it teaches is that the desktop is not for you.
+    /// Four cards, and which four is the whole decision. This used to open Identity, Session,
+    /// Capabilities, Journal and Insight — a good first screen for somebody studying how CYBOU is
+    /// built, and the wrong one for somebody who has just been handed a server. They do not arrive
+    /// asking who they are to Identity1. They arrive asking whether the machine is healthy, what
+    /// is broken, what it is busy doing, and whether anything needs them.
     ///
-    /// These five answer the questions somebody actually arrives with. Who am I here and is this
-    /// session real (Identity, Session); what is this host able to do right now (Capabilities);
-    /// what has it been doing (Journal); and what does it currently think is wrong (Insight).
+    /// So: what this host makes of itself (Insight), what it is spending (Monitor), what is
+    /// running right now (Operations), and what is waiting for an answer (Notifications).
+    ///
+    /// Nothing was removed from the product. Every System card is still one click away in the Dock
+    /// and the command palette, still in [`CardId::ALL_SYSTEM_CARDS`], and still what the desktop
+    /// is checked against; who this reader is and whether the session is real is answered compactly
+    /// in the top bar, which is where an operating system answers it. What changed is only what
+    /// happens before anybody has chosen anything.
     #[must_use]
     pub fn canonical(viewport: Option<UsableViewport>) -> Self {
         let mut layout = Self::new();
         let canonical_cards = [
-            CardId::Identity,
-            CardId::Session,
-            CardId::Capabilities,
-            CardId::Journal,
             CardId::Insight,
+            CardId::Monitor(0),
+            CardId::Operations(0),
+            CardId::Notifications(0),
         ];
         for (idx, card_id) in canonical_cards.iter().enumerate() {
             let spec = card_id.spec();
@@ -121,9 +124,11 @@ impl DesktopLayout {
                 presentation: CardPresentation::default(),
             });
         }
-        // The nine that are not open are recorded as closed rather than merely absent. That is
-        // the first-visit decision stated: these exist, they are one click away, and they start
-        // shut. Absent would mean "we have not heard of them", and the next load would open them.
+        // The thirteen System cards that are not open are recorded as closed rather than merely
+        // absent. That is the first-visit decision stated: these exist, they are one click away,
+        // and they start shut. Absent would mean "we have not heard of them", and the next load
+        // would open them. Monitor, Operations and Notifications are not System cards and need no
+        // such record: nothing re-adds a tool card that is missing.
         layout.closed = CardId::ALL_SYSTEM_CARDS
             .into_iter()
             .filter(|card| !canonical_cards.contains(card))

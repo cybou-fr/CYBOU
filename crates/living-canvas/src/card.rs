@@ -728,7 +728,11 @@ impl CardId {
                 collapsible: true,
                 closable: true,
                 deckable: true,
-                default_size: (560.0, 420.0),
+                // A dashboard tile rather than a workspace. These three open together on a first
+                // visit, and at their old sizes -- 560 by 460 and its neighbours -- four of them
+                // could not tile a 1440 by 804 window without one running under the dock. Resizing
+                // is a drag away for anyone who wants the long view.
+                default_size: (420.0, 300.0),
                 min_size: (360.0, 260.0),
                 max_size: (1200.0, 900.0),
             },
@@ -740,7 +744,7 @@ impl CardId {
                 collapsible: true,
                 closable: true,
                 deckable: true,
-                default_size: (520.0, 440.0),
+                default_size: (400.0, 300.0),
                 min_size: (340.0, 260.0),
                 max_size: (1000.0, 900.0),
             },
@@ -776,7 +780,7 @@ impl CardId {
                 collapsible: true,
                 closable: true,
                 deckable: true,
-                default_size: (560.0, 460.0),
+                default_size: (420.0, 300.0),
                 min_size: (380.0, 300.0),
                 max_size: (1200.0, 900.0),
             },

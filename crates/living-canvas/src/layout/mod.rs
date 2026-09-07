@@ -64,12 +64,35 @@ mod tests {
         assert!((cap_geom.y - 70.0).abs() < 1e-6);
     }
 
+    /// A layout holding the Mind cards these invariant tests are written against.
+    ///
+    /// The first visit stopped opening Identity, Session and Journal when the desktop's home became
+    /// the operator's rather than the architecture's. The tests below are about decks, z-order,
+    /// history, snapping and coordinates — not about what opens on a first visit — so they now say
+    /// which cards they need instead of relying on a default that answers a different question.
+    fn layout_with_mind_cards() -> DesktopLayout {
+        let mut layout = DesktopLayout::default();
+        for (index, card) in [CardId::Identity, CardId::Session, CardId::Journal]
+            .into_iter()
+            .enumerate()
+        {
+            #[allow(
+                clippy::cast_precision_loss,
+                reason = "three cards, stacked at a fixed pitch"
+            )]
+            let y = 40.0 + 260.0 * index as f64;
+            layout.open_card(card, 40.0, y);
+        }
+        layout
+    }
+
     #[test]
-    fn the_first_desktop_is_a_chosen_few_and_every_other_card_is_still_reachable() {
-        // This used to require the default layout to hold all fourteen System cards, and it did:
-        // a first visit opened fourteen panels of unfamiliar vocabulary at once. The five below
-        // are a decision about what somebody arrives wanting to know, not a claim that the rest
-        // stopped mattering — so the second half of this test is the half that protects them.
+    fn the_first_desktop_answers_what_an_operator_arrives_asking() {
+        // This required all fourteen System cards once, then the five that explain how CYBOU is
+        // built. Neither is what somebody handed a server wants first: is it healthy, what is it
+        // spending, what is it doing, does anything need me. The four below are that decision, not
+        // a claim that the rest stopped mattering — so the second half of this test is the half
+        // that protects them.
         // `load()`, not `default()`. The browser calls the loader, the loader normalizes, and
         // normalizing used to re-add every System card the layout was missing — so this test read
         // five while the desktop drew fourteen. A test that calls a different function from the one
@@ -78,17 +101,30 @@ mod tests {
         assert_eq!(layout.schema_version, LAYOUT_SCHEMA_VERSION);
 
         let expected = [
-            CardId::Identity,
-            CardId::Session,
-            CardId::Capabilities,
-            CardId::Journal,
             CardId::Insight,
+            CardId::Monitor(0),
+            CardId::Operations(0),
+            CardId::Notifications(0),
         ];
         assert_eq!(layout.cards.len(), expected.len());
         for card in expected {
             assert!(
                 layout.contains_card(card),
                 "{card:?} opens on a first visit"
+            );
+        }
+
+        // What used to open on a first visit is not gone, only shut: closed rather than absent, so
+        // the loader does not put it back and the Dock still opens it.
+        for previously_open in [
+            CardId::Identity,
+            CardId::Session,
+            CardId::Capabilities,
+            CardId::Journal,
+        ] {
+            assert!(
+                layout.closed.contains(&previously_open),
+                "{previously_open:?} starts shut rather than forgotten"
             );
         }
 
@@ -108,7 +144,12 @@ mod tests {
     fn a_place_is_named_after_what_is_standing_in_it() {
         // The name a person would have typed. Making an anchor used to mean leaving the place,
         // opening a panel about the canvas, and describing a view no longer on screen.
-        let layout = DesktopLayout::load();
+        // Two cards and nothing else, placed where this test can reason about them. Asking the
+        // first-visit layout would make this a test of what the desktop opens with as much as of
+        // how a place is named, and the two change for different reasons.
+        let mut layout = DesktopLayout::new();
+        layout.open_card(CardId::Identity, 0.0, 0.0);
+        layout.open_card(CardId::Session, 0.0, 248.0);
         // Tight enough to hold Identity and stop above Session, which starts at y=248.
         let over_identity = Rect::new(0.0, 0.0, 300.0, 240.0);
         assert_eq!(layout.name_for_view(over_identity), "Identity");
@@ -143,7 +184,7 @@ mod tests {
         // The origin is not a corner. Dragging clamped to twelve pixels from it and normalizing
         // clamped to zero, so a plane described as unbounded had a wall in one corner that nothing
         // on screen explained — and a card dragged past it snapped back on the next load.
-        let mut layout = DesktopLayout::load();
+        let mut layout = layout_with_mind_cards();
         layout.set_position(CardId::Identity, -420.0, -260.0);
 
         layout.validate_and_normalize();
@@ -193,7 +234,7 @@ mod tests {
 
     #[test]
     fn layout_invariants_l1_to_l4_deck_management() {
-        let mut layout = DesktopLayout::default();
+        let mut layout = layout_with_mind_cards();
 
         // L4: Non-deckable card cannot enter deck
         let non_deckable = CardId::JournalFeed(0);
@@ -246,7 +287,7 @@ mod tests {
 
     #[test]
     fn layout_invariants_l5_l6_l7_grid_and_compact_obstacle_avoidance_no_overlap() {
-        let mut layout = DesktopLayout::default();
+        let mut layout = layout_with_mind_cards();
 
         // Pin Identity as an obstacle at (40, 40)
         layout.set_position(CardId::Identity, 40.0, 40.0);
@@ -317,7 +358,7 @@ mod tests {
 
     #[test]
     fn layout_invariant_l14_unified_monotonic_z_index() {
-        let mut layout = DesktopLayout::default();
+        let mut layout = layout_with_mind_cards();
         let d_id = layout
             .create_deck(
                 "Deck1",
@@ -410,7 +451,7 @@ mod tests {
     #[test]
     fn layout_history_undo_redo() {
         let mut history = LayoutHistory::new();
-        let initial = DesktopLayout::default();
+        let initial = layout_with_mind_cards();
         history.push(initial.clone());
 
         let mut modified = initial.clone();
@@ -596,8 +637,10 @@ mod tests {
         // The one thing the v9 to v10 migration must not get wrong. A cluster written before the
         // field existed was written by a person, and reading it as suggested would hand the
         // desktop permission to delete their work the moment its cards were closed.
-        let mut v9 = DesktopLayout::default();
-        v9.schema_version = 9;
+        let mut v9 = DesktopLayout {
+            schema_version: 9,
+            ..DesktopLayout::default()
+        };
         v9.clusters.push(DesktopCluster {
             id: "mine".into(),
             label: "Mine".into(),
@@ -696,7 +739,7 @@ mod tests {
 
     #[test]
     fn snap_calculation_aligns_edges_and_generates_guides() {
-        let layout = DesktopLayout::default();
+        let layout = layout_with_mind_cards();
         let id_geom = layout.geometry(CardId::Identity);
         let id_right = id_geom.x + id_geom.width;
         // Place candidate very close to Identity's right edge and top edge
