@@ -507,8 +507,8 @@ pub fn FileManagerContent(
                 };
                 GatewayMindClient.host_create_directory(&req).await
             } else {
-                Err(crate::ClientError::GatewayRequest(
-                    "Directory creation in sandbox is restricted".to_string(),
+                Err(crate::ClientError::unsupported(
+                    &"Directory creation is not offered inside the sandbox",
                 ))
             };
 
@@ -556,8 +556,8 @@ pub fn FileManagerContent(
                 let req = HostPathRenameRequest { from_path, to_path };
                 GatewayMindClient.host_rename_path(&req).await
             } else {
-                Err(crate::ClientError::GatewayRequest(
-                    "Rename in sandbox is restricted".to_string(),
+                Err(crate::ClientError::unsupported(
+                    &"Rename is not offered inside the sandbox",
                 ))
             };
 
@@ -597,8 +597,8 @@ pub fn FileManagerContent(
                 };
                 GatewayMindClient.host_delete_path(&req).await
             } else {
-                Err(crate::ClientError::GatewayRequest(
-                    "Deletion in sandbox is restricted".to_string(),
+                Err(crate::ClientError::unsupported(
+                    &"Deletion is not offered inside the sandbox",
                 ))
             };
 

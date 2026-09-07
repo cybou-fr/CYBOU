@@ -22,7 +22,6 @@ use cybou_web_contracts::{
     HostFileCreateRequest, HostFileWriteRequest, HostPathCopyRequest, HostPathDeleteRequest,
     HostPathRenameRequest, MindProjection, SessionProjection, SnapshotProjection,
 };
-use thiserror::Error;
 
 pub mod ansi;
 pub mod applications;
@@ -68,26 +67,249 @@ pub use layout::{
 pub use layout::{apply_camera_back, apply_camera_fly_to, apply_camera_forward, camera_center};
 
 /// Error returned by a typed Mind client operation.
-#[derive(Clone, Debug, Eq, Error, PartialEq)]
+///
+/// Four of these describe one exchange with the machine, and they are four because a person needs
+/// them apart. `GatewayRequest(String)` used to be all of them at once: it carried whatever the
+/// underlying library said, and what the underlying library says about a gateway that is not
+/// running is `expected value at line 1 column 1` — a serde parse position, shown to somebody who
+/// wanted to know whether their server was up. Every card on the desktop printed it.
+///
+/// Which one it is decides what a person does next, and nothing else in this type does: unreachable
+/// means go and look at the machine, refused means it is running and said no, unreadable means the
+/// two ends disagree about the contract, and malformed means the fault is in this desktop.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ClientError {
     /// No accepted gateway session is available.
-    #[error("gateway session is unavailable")]
     SessionUnavailable,
     /// The current fixture/client cannot supply the requested projection.
-    #[error("projection is unavailable: {0}")]
     ProjectionUnavailable(String),
     /// A deterministic fixture violates the typed web contract.
-    #[error("invalid deterministic fixture: {0}")]
     InvalidFixture(String),
-    /// The same-origin gateway request or typed response failed.
-    #[error("gateway request failed: {0}")]
-    GatewayRequest(String),
+    /// The machine did not answer at all.
+    Unreachable {
+        /// What the transport said, for a reader who is debugging rather than working.
+        detail: String,
+    },
+    /// The machine answered, and would not do it.
+    Refused {
+        /// The HTTP status it answered with.
+        status: u16,
+        /// The machine's own explanation, where it gave one. Preferred over anything this desktop
+        /// could infer from the status: the owner that refused knows why and the browser does not.
+        detail: Option<String>,
+    },
+    /// The machine answered with something this desktop could not read.
+    Unreadable {
+        /// What the decoder said.
+        detail: String,
+    },
+    /// This desktop could not form the request. The fault is here, not on the machine.
+    Malformed {
+        /// What the encoder said.
+        detail: String,
+    },
+    /// The desktop does not offer this action on this kind of thing, and never asked the machine.
+    ///
+    /// Not a refusal by the machine, which is why it is not one: the sandbox domain has no
+    /// directory creation to refuse. Reporting it as an HTTP status would attribute a decision to
+    /// an owner that was never consulted.
+    Unsupported {
+        /// What is not offered here, in words a person can read.
+        detail: String,
+    },
     /// A conditional file write was based on content that is no longer current.
-    #[error("file changed since this editor read it")]
     FileChangedSinceRead,
     /// Exclusive creation refused because the requested file already exists.
-    #[error("file already exists")]
     FileAlreadyExists,
+}
+
+impl ClientError {
+    /// The machine could not be reached.
+    #[must_use]
+    pub fn unreachable(detail: &impl ToString) -> Self {
+        Self::Unreachable {
+            detail: detail.to_string(),
+        }
+    }
+
+    /// The machine answered with something this desktop could not read.
+    #[must_use]
+    pub fn unreadable(detail: &impl ToString) -> Self {
+        Self::Unreadable {
+            detail: detail.to_string(),
+        }
+    }
+
+    /// This desktop could not form the request.
+    #[must_use]
+    pub fn malformed(detail: &impl ToString) -> Self {
+        Self::Malformed {
+            detail: detail.to_string(),
+        }
+    }
+
+    /// The machine refused, with its own explanation where it gave one.
+    #[must_use]
+    pub const fn refused(status: u16, detail: Option<String>) -> Self {
+        Self::Refused { status, detail }
+    }
+
+    /// This action is not offered on this kind of thing.
+    #[must_use]
+    pub fn unsupported(detail: &impl ToString) -> Self {
+        Self::Unsupported {
+            detail: detail.to_string(),
+        }
+    }
+
+    /// What the underlying layer said, for a reader who is debugging rather than working.
+    ///
+    /// Deliberately not part of [`Display`]: it is kept so that nothing is thrown away, and kept
+    /// out of the sentence so that nothing meaningless is shown.
+    #[must_use]
+    pub fn detail(&self) -> Option<&str> {
+        match self {
+            Self::Unreachable { detail }
+            | Self::Unreadable { detail }
+            | Self::Malformed { detail }
+            | Self::Unsupported { detail }
+            | Self::ProjectionUnavailable(detail)
+            | Self::InvalidFixture(detail) => Some(detail),
+            Self::Refused { detail, .. } => detail.as_deref(),
+            Self::SessionUnavailable | Self::FileChangedSinceRead | Self::FileAlreadyExists => None,
+        }
+    }
+}
+
+impl std::fmt::Display for ClientError {
+    /// One sentence a person can act on, in every case.
+    ///
+    /// The status classes are separated because the remedies are: a 401 or 403 is answered by
+    /// signing in or by being granted something, a 404 by looking for the thing somewhere else, and
+    /// a 5xx by looking at the machine. Collapsing them into "request failed" told a person which
+    /// of those to do exactly as often as guessing would.
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::SessionUnavailable => formatter.write_str("this session is not signed in"),
+            Self::ProjectionUnavailable(what) => {
+                write!(formatter, "this reader was not supplied {what}")
+            }
+            Self::InvalidFixture(what) => write!(formatter, "a built-in example is wrong: {what}"),
+            Self::Unreachable { .. } => formatter.write_str("this machine did not answer"),
+            Self::Refused { status, detail } => {
+                if let Some(detail) = detail {
+                    return formatter.write_str(detail);
+                }
+                match *status {
+                    401 => formatter.write_str("this session is not signed in"),
+                    403 => formatter.write_str("this account is not permitted to do that"),
+                    404 => formatter.write_str("this machine has no such thing"),
+                    409 => formatter.write_str("something changed since this was read"),
+                    429 => formatter.write_str("too many requests; wait and try again"),
+                    500..=599 => formatter.write_str("this machine failed while doing it"),
+                    other => write!(formatter, "this machine refused, answering {other}"),
+                }
+            }
+            Self::Unreadable { .. } => {
+                formatter.write_str("this machine answered with something the desktop cannot read")
+            }
+            Self::Malformed { .. } => formatter.write_str("the desktop could not form the request"),
+            Self::Unsupported { detail } => formatter.write_str(detail),
+            Self::FileChangedSinceRead => {
+                formatter.write_str("this file changed since the editor read it")
+            }
+            Self::FileAlreadyExists => formatter.write_str("that file already exists"),
+        }
+    }
+}
+
+impl std::error::Error for ClientError {}
+
+#[cfg(test)]
+mod client_error_tests {
+    use super::ClientError;
+
+    #[test]
+    fn nothing_a_person_is_shown_is_a_parse_position() {
+        // The whole point. What the underlying library says about a gateway that is not running is
+        // "expected value at line 1 column 1", and every card on the desktop printed it.
+        let unreadable = ClientError::unreadable(&"expected value at line 1 column 1");
+        assert_eq!(
+            unreadable.to_string(),
+            "this machine answered with something the desktop cannot read"
+        );
+        // Kept rather than thrown away: out of the sentence, still there for whoever is debugging.
+        assert_eq!(
+            unreadable.detail(),
+            Some("expected value at line 1 column 1")
+        );
+    }
+
+    #[test]
+    fn the_four_ways_an_exchange_fails_read_as_four_different_things() {
+        // Each one sends a person somewhere different, which is why they are not one variant.
+        assert_eq!(
+            ClientError::unreachable(&"NetworkError").to_string(),
+            "this machine did not answer"
+        );
+        assert_eq!(
+            ClientError::refused(403, None).to_string(),
+            "this account is not permitted to do that"
+        );
+        assert_eq!(
+            ClientError::unreadable(&"trailing characters").to_string(),
+            "this machine answered with something the desktop cannot read"
+        );
+        assert_eq!(
+            ClientError::malformed(&"serialize failed").to_string(),
+            "the desktop could not form the request"
+        );
+    }
+
+    #[test]
+    fn a_status_is_read_for_what_it_asks_a_person_to_do() {
+        assert_eq!(
+            ClientError::refused(401, None).to_string(),
+            "this session is not signed in"
+        );
+        assert_eq!(
+            ClientError::refused(404, None).to_string(),
+            "this machine has no such thing"
+        );
+        assert_eq!(
+            ClientError::refused(503, None).to_string(),
+            "this machine failed while doing it"
+        );
+        // An unmapped status still says something true and names the number, rather than pretending
+        // to know which of the remedies applies.
+        assert_eq!(
+            ClientError::refused(418, None).to_string(),
+            "this machine refused, answering 418"
+        );
+    }
+
+    #[test]
+    fn the_machines_own_explanation_wins_over_anything_inferred_from_a_status() {
+        // The owner that refused knows why. A browser reading 403 does not, and guessing over the
+        // top of an answer that was given is how a person is told the wrong thing confidently.
+        let refused = ClientError::refused(
+            403,
+            Some("this account may not write outside its own home".to_owned()),
+        );
+        assert_eq!(
+            refused.to_string(),
+            "this account may not write outside its own home"
+        );
+    }
+
+    #[test]
+    fn a_refusal_that_never_left_the_browser_is_not_reported_as_the_machines() {
+        let unsupported = ClientError::unsupported(&"Rename is not offered inside the sandbox");
+        assert_eq!(
+            unsupported.to_string(),
+            "Rename is not offered inside the sandbox"
+        );
+    }
 }
 
 /// Only data boundary used by the frontend. Browser code never receives D-Bus or native handles.
@@ -139,7 +361,7 @@ pub trait MindClient {
     ///
     /// # Errors
     ///
-    /// Returns [`ClientError::GatewayRequest`] when the surface cannot be asked. That is not the
+    /// Returns [`ClientError`] when the surface cannot be asked. That is not the
     /// same as no sessions, and the two must not collapse into one another.
     async fn agents(&self) -> Result<Vec<cybou_protocol::agent::SessionView>, ClientError>;
 
@@ -147,7 +369,7 @@ pub trait MindClient {
     ///
     /// # Errors
     ///
-    /// Returns [`ClientError::GatewayRequest`] when the caller is not entitled to launch, the
+    /// Returns [`ClientError`] when the caller is not entitled to launch, the
     /// profile refuses the selection, host capacity is exhausted, or Agent1 is unavailable.
     async fn launch_agent(
         &self,
@@ -158,7 +380,7 @@ pub trait MindClient {
     ///
     /// # Errors
     ///
-    /// Returns [`ClientError::GatewayRequest`] when Agent1 is unavailable.
+    /// Returns [`ClientError`] when Agent1 is unavailable.
     async fn agent_offers(&self)
     -> Result<cybou_protocol::agent::AgentOffersResponse, ClientError>;
 
@@ -166,7 +388,7 @@ pub trait MindClient {
     ///
     /// # Errors
     ///
-    /// Returns [`ClientError::GatewayRequest`] when Action1 is unavailable.
+    /// Returns [`ClientError`] when Action1 is unavailable.
     async fn actions(
         &self,
         cause_id: Option<uuid::Uuid>,
@@ -190,7 +412,7 @@ pub trait MindClient {
     ///
     /// # Errors
     ///
-    /// Returns [`ClientError::GatewayRequest`] when the caller is not entitled to stop it, the
+    /// Returns [`ClientError`] when the caller is not entitled to stop it, the
     /// teardown cannot be confirmed, or Agent1 is unavailable.
     async fn stop_agent(&self, capsule_id: uuid::Uuid) -> Result<(), ClientError>;
 
@@ -747,9 +969,9 @@ impl MindClient for MockMindClient {
     }
 
     async fn mind(&self) -> Result<MindProjection, ClientError> {
-        self.mind.clone().ok_or_else(|| {
-            ClientError::GatewayRequest("mock client holds no owner projection".into())
-        })
+        self.mind
+            .clone()
+            .ok_or_else(|| ClientError::ProjectionUnavailable("what the owners hold".into()))
     }
 
     async fn insight(&self) -> Result<cybou_web_contracts::InsightProjection, ClientError> {
@@ -773,16 +995,16 @@ impl MindClient for MockMindClient {
     async fn agents(&self) -> Result<Vec<cybou_protocol::agent::SessionView>, ClientError> {
         self.agents
             .clone()
-            .ok_or_else(|| ClientError::GatewayRequest("mock client holds no agent runtime".into()))
+            .ok_or_else(|| ClientError::ProjectionUnavailable("a running agent".into()))
     }
 
     async fn launch_agent(
         &self,
         _request: &cybou_protocol::agent::LaunchRequest,
     ) -> Result<cybou_protocol::agent::SessionView, ClientError> {
-        Err(ClientError::GatewayRequest(
-            "mock client launches no agent sessions".into(),
-        ))
+        Err(ClientError::Unsupported {
+            detail: "mock client launches no agent sessions".into(),
+        })
     }
 
     async fn agent_offers(
@@ -799,9 +1021,9 @@ impl MindClient for MockMindClient {
     }
 
     async fn stop_agent(&self, capsule_id: uuid::Uuid) -> Result<(), ClientError> {
-        Err(ClientError::GatewayRequest(format!(
-            "mock client stops no agent session {capsule_id}"
-        )))
+        Err(ClientError::Unsupported {
+            detail: format!("mock client stops no agent session {capsule_id}"),
+        })
     }
 
     async fn control_agent(
@@ -873,15 +1095,15 @@ impl MindClient for MockMindClient {
     async fn list_directory(&self, path: &str) -> Result<DirectoryListingProjection, ClientError> {
         // A mock holds no sandbox. Answering with an empty directory would be the failure the
         // typed routes exist to remove: nothing there, and nothing saying why.
-        Err(ClientError::GatewayRequest(format!(
-            "mock client holds no sandbox to list {path} in"
-        )))
+        Err(ClientError::Unsupported {
+            detail: format!("mock client holds no sandbox to list {path} in"),
+        })
     }
 
     async fn read_text_file(&self, path: &str) -> Result<FileContentProjection, ClientError> {
-        Err(ClientError::GatewayRequest(format!(
-            "mock client holds no sandbox to read {path} from"
-        )))
+        Err(ClientError::Unsupported {
+            detail: format!("mock client holds no sandbox to read {path} from"),
+        })
     }
 
     async fn write_text_file(
@@ -930,15 +1152,15 @@ impl MindClient for MockMindClient {
         &self,
         path: &str,
     ) -> Result<HostDirectoryListingProjection, ClientError> {
-        Err(ClientError::GatewayRequest(format!(
-            "mock client holds no host filesystem to list {path} in"
-        )))
+        Err(ClientError::Unsupported {
+            detail: format!("mock client holds no host filesystem to list {path} in"),
+        })
     }
 
     async fn host_read_file(&self, path: &str) -> Result<FileContentProjection, ClientError> {
-        Err(ClientError::GatewayRequest(format!(
-            "mock client holds no host filesystem to read {path} from"
-        )))
+        Err(ClientError::Unsupported {
+            detail: format!("mock client holds no host filesystem to read {path} from"),
+        })
     }
 
     async fn host_write_file(
@@ -1185,9 +1407,9 @@ impl MindClient for MockMindClient {
         action: cybou_protocol::system::PackageActionKind,
     ) -> Result<cybou_web_contracts::ActionRecordProjection, ClientError> {
         let _ = action;
-        Err(ClientError::GatewayRequest(format!(
-            "no Action1 to propose a package action on {name}"
-        )))
+        Err(ClientError::Unsupported {
+            detail: format!("no Action1 to propose a package action on {name}"),
+        })
     }
 
     async fn get_system_updates(

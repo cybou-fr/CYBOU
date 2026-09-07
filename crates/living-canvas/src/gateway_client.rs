@@ -29,23 +29,20 @@ impl GatewayMindClient {
     ) -> Result<FileWriteProjection, ClientError> {
         let response = Request::post("/api/v1/files/create")
             .json(request)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if response.status() == 409 {
             return Err(ClientError::FileAlreadyExists);
         }
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/files/create returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     /// List durable drafts for the authenticated principal.
@@ -60,20 +57,17 @@ impl GatewayMindClient {
     ) -> Result<UserDraftProjection, ClientError> {
         let response = Request::post("/api/v1/drafts/save")
             .json(request)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/drafts/save returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     /// Delete one recovery snapshot after save or explicit discard.
@@ -82,17 +76,14 @@ impl GatewayMindClient {
             .json(&UserDraftDeleteRequest {
                 draft_id: draft_id.to_owned(),
             })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if response.ok() {
             Ok(())
         } else {
-            Err(ClientError::GatewayRequest(format!(
-                "/api/v1/drafts/delete returned HTTP {}",
-                response.status()
-            )))
+            Err(ClientError::refused(response.status(), None))
         }
     }
 
@@ -102,37 +93,31 @@ impl GatewayMindClient {
             .json(&FilePathRequest {
                 path: path.to_owned(),
             })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "{route} returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn get<T: DeserializeOwned>(path: &str) -> Result<T, ClientError> {
         let response = Request::get(path)
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "{path} returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 }
 
@@ -168,20 +153,17 @@ impl MindClient for GatewayMindClient {
     ) -> Result<cybou_protocol::agent::SessionView, ClientError> {
         let response = Request::post("/api/v1/agents")
             .json(request)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/agents returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn agent_offers(
@@ -205,14 +187,11 @@ impl MindClient for GatewayMindClient {
         let response = Request::delete(&path)
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if response.ok() {
             Ok(())
         } else {
-            Err(ClientError::GatewayRequest(format!(
-                "{path} returned HTTP {}",
-                response.status()
-            )))
+            Err(ClientError::refused(response.status(), None))
         }
     }
 
@@ -224,10 +203,10 @@ impl MindClient for GatewayMindClient {
         let path = format!("/api/v1/agents/{capsule_id}/action");
         let response = Request::post(&path)
             .json(&cybou_web_contracts::CapsuleControlRequest { action })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if response.ok() {
             return Ok(());
         }
@@ -243,9 +222,7 @@ impl MindClient for GatewayMindClient {
                     .and_then(serde_json::Value::as_str)
                     .map(ToOwned::to_owned)
             });
-        Err(ClientError::GatewayRequest(detail.unwrap_or_else(|| {
-            format!("{path} returned HTTP {status}")
-        })))
+        Err(ClientError::refused(status, detail))
     }
 
     async fn agent_telemetry(
@@ -256,17 +233,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get(&path)
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "{path} returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn list_directory(&self, path: &str) -> Result<DirectoryListingProjection, ClientError> {
@@ -283,23 +257,20 @@ impl MindClient for GatewayMindClient {
     ) -> Result<FileWriteProjection, ClientError> {
         let response = Request::post("/api/v1/files/write")
             .json(request)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if response.status() == 409 {
             return Err(ClientError::FileChangedSinceRead);
         }
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/files/write returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn create_file(
@@ -308,23 +279,20 @@ impl MindClient for GatewayMindClient {
     ) -> Result<FileWriteProjection, ClientError> {
         let response = Request::post("/api/v1/files/create")
             .json(request)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if response.status() == 409 {
             return Err(ClientError::FileAlreadyExists);
         }
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/files/create returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn confirm_action(
@@ -333,20 +301,17 @@ impl MindClient for GatewayMindClient {
     ) -> Result<cybou_web_contracts::ActionRecordProjection, ClientError> {
         let response = Request::post("/api/v1/actions/confirm")
             .json(request)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/actions/confirm returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn upload_file(
@@ -355,25 +320,22 @@ impl MindClient for GatewayMindClient {
     ) -> Result<cybou_web_contracts::FileUploadProjection, ClientError> {
         let response = Request::post("/api/v1/files/upload")
             .json(request)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         // The gateway refuses rather than replaces, so this is the ordinary answer to dropping a
         // file onto a directory that already holds one by that name, not an error condition.
         if response.status() == 409 {
             return Err(ClientError::FileAlreadyExists);
         }
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/files/upload returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn download_file(&self, path: &str) -> Result<Vec<u8>, ClientError> {
@@ -381,20 +343,17 @@ impl MindClient for GatewayMindClient {
             .json(&cybou_web_contracts::FilePathRequest {
                 path: path.to_owned(),
             })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/files/download returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .binary()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreachable(&error))
     }
 
     async fn host_list_directory(
@@ -414,23 +373,20 @@ impl MindClient for GatewayMindClient {
     ) -> Result<FileWriteProjection, ClientError> {
         let response = Request::post("/api/v1/host-files/write")
             .json(request)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if response.status() == 409 {
             return Err(ClientError::FileChangedSinceRead);
         }
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/host-files/write returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn host_create_file(
@@ -439,23 +395,20 @@ impl MindClient for GatewayMindClient {
     ) -> Result<FileWriteProjection, ClientError> {
         let response = Request::post("/api/v1/host-files/create")
             .json(request)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if response.status() == 409 {
             return Err(ClientError::FileAlreadyExists);
         }
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/host-files/create returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn host_create_directory(
@@ -464,68 +417,56 @@ impl MindClient for GatewayMindClient {
     ) -> Result<(), ClientError> {
         let response = Request::post("/api/v1/host-files/mkdir")
             .json(request)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if response.ok() {
             Ok(())
         } else {
-            Err(ClientError::GatewayRequest(format!(
-                "/api/v1/host-files/mkdir returned HTTP {}",
-                response.status()
-            )))
+            Err(ClientError::refused(response.status(), None))
         }
     }
 
     async fn host_rename_path(&self, request: &HostPathRenameRequest) -> Result<(), ClientError> {
         let response = Request::post("/api/v1/host-files/rename")
             .json(request)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if response.ok() {
             Ok(())
         } else {
-            Err(ClientError::GatewayRequest(format!(
-                "/api/v1/host-files/rename returned HTTP {}",
-                response.status()
-            )))
+            Err(ClientError::refused(response.status(), None))
         }
     }
 
     async fn host_delete_path(&self, request: &HostPathDeleteRequest) -> Result<(), ClientError> {
         let response = Request::post("/api/v1/host-files/delete")
             .json(request)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if response.ok() {
             Ok(())
         } else {
-            Err(ClientError::GatewayRequest(format!(
-                "/api/v1/host-files/delete returned HTTP {}",
-                response.status()
-            )))
+            Err(ClientError::refused(response.status(), None))
         }
     }
 
     async fn host_copy_path(&self, request: &HostPathCopyRequest) -> Result<(), ClientError> {
         let response = Request::post("/api/v1/host-files/copy")
             .json(request)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if response.ok() {
             Ok(())
         } else {
-            Err(ClientError::GatewayRequest(format!(
-                "/api/v1/host-files/copy returned HTTP {}",
-                response.status()
-            )))
+            Err(ClientError::refused(response.status(), None))
         }
     }
 
@@ -535,17 +476,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get("/api/v1/operations")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/operations returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn get_operation_logs(
@@ -555,17 +493,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get(&format!("/api/v1/operations/{id}/logs"))
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/operations/{id}/logs returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn cancel_operation(
@@ -578,17 +513,15 @@ impl MindClient for GatewayMindClient {
                 operation_id: id,
                 reason,
             })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         match response.status() {
             // 202 is the owner accepting a request; only the worker may later publish Cancelled.
             202 => Ok(cybou_protocol::operation::CancelOutcome::CancellationAccepted),
             200 => Ok(cybou_protocol::operation::CancelOutcome::CancellationConfirmed),
-            status => Err(ClientError::GatewayRequest(format!(
-                "/api/v1/operations/cancel returned HTTP {status}"
-            ))),
+            status => Err(ClientError::refused(status, None)),
         }
     }
 
@@ -598,17 +531,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get("/api/v1/notifications")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/notifications returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn dismiss_notifications(
@@ -621,17 +551,14 @@ impl MindClient for GatewayMindClient {
                 notification_id: id,
                 dismiss_all,
             })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if response.ok() {
             Ok(())
         } else {
-            Err(ClientError::GatewayRequest(format!(
-                "/api/v1/notifications/dismiss returned HTTP {}",
-                response.status()
-            )))
+            Err(ClientError::refused(response.status(), None))
         }
     }
 
@@ -645,20 +572,17 @@ impl MindClient for GatewayMindClient {
                 notification_id: id,
                 action_id: action_id.to_owned(),
             })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/notifications/action returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         let outcome: serde_json::Value = response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreadable(&error))?;
         Ok(outcome["outcome"]
             .as_str()
             .unwrap_or("Action executed")
@@ -671,17 +595,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get("/api/v1/system/services")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/services returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn execute_service_action(
@@ -694,20 +615,17 @@ impl MindClient for GatewayMindClient {
                 name: name.to_owned(),
                 action,
             })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/services/action returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn list_processes(
@@ -716,17 +634,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get("/api/v1/system/processes")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/processes returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn send_process_signal(
@@ -736,20 +651,17 @@ impl MindClient for GatewayMindClient {
     ) -> Result<cybou_web_contracts::ActionRecordProjection, ClientError> {
         let response = Request::post("/api/v1/system/processes/signal")
             .json(&cybou_web_contracts::ProcessSignalRequest { pid, signal })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/processes/signal returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn get_system_monitor(
@@ -758,17 +670,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get("/api/v1/system/monitor")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/monitor returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn get_system_logs(
@@ -791,34 +700,28 @@ impl MindClient for GatewayMindClient {
         let response = Request::get(&url)
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/logs returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn get_storage(&self) -> Result<cybou_web_contracts::StorageProjection, ClientError> {
         let response = Request::get("/api/v1/system/storage")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/storage returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn create_snapshot(
@@ -833,20 +736,17 @@ impl MindClient for GatewayMindClient {
                 name: name.to_owned(),
                 readonly,
             })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/storage/snapshots returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn restore_snapshot(&self, snapshot_id: &str) -> Result<String, ClientError> {
@@ -854,20 +754,17 @@ impl MindClient for GatewayMindClient {
             .json(&cybou_web_contracts::RestoreSnapshotRequest {
                 snapshot_id: snapshot_id.to_owned(),
             })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/storage/restore returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         let outcome: serde_json::Value = response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreadable(&error))?;
         Ok(outcome["outcome"]
             .as_str()
             .unwrap_or("Snapshot restored")
@@ -878,17 +775,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get("/api/v1/system/network")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/network returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn connect_network(
@@ -901,20 +795,17 @@ impl MindClient for GatewayMindClient {
                 connection_id: connection_id.to_owned(),
                 activate,
             })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/network/connect returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         let outcome: serde_json::Value = response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreadable(&error))?;
         Ok(outcome["outcome"]
             .as_str()
             .unwrap_or("Network updated")
@@ -925,17 +816,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get("/api/v1/system/packages")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/packages returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn execute_package_action(
@@ -948,21 +836,18 @@ impl MindClient for GatewayMindClient {
                 name: name.to_owned(),
                 action,
             })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/packages/action returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         // What comes back is the proposal's record, not a report that anything was installed.
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn get_system_updates(
@@ -971,17 +856,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get("/api/v1/system/updates")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/updates returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn apply_system_updates(
@@ -990,20 +872,17 @@ impl MindClient for GatewayMindClient {
     ) -> Result<String, ClientError> {
         let response = Request::post("/api/v1/system/updates/apply")
             .json(&cybou_web_contracts::ApplyUpdatesRequest { package_names })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/updates/apply returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         let outcome: serde_json::Value = response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreadable(&error))?;
         Ok(outcome["outcome"]
             .as_str()
             .unwrap_or("System updates applied")
@@ -1016,17 +895,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get("/api/v1/system/users")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/users returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn create_user(
@@ -1041,20 +917,17 @@ impl MindClient for GatewayMindClient {
                 full_name: full_name.to_owned(),
                 is_admin,
             })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/users returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn add_ssh_key(
@@ -1067,20 +940,17 @@ impl MindClient for GatewayMindClient {
                 name: name.to_owned(),
                 public_key: public_key.to_owned(),
             })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/users/ssh-keys returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn delete_ssh_key(&self, key_id: &str) -> Result<String, ClientError> {
@@ -1088,20 +958,17 @@ impl MindClient for GatewayMindClient {
             .json(&cybou_web_contracts::DeleteSshKeyRequest {
                 key_id: key_id.to_owned(),
             })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/users/ssh-keys/delete returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         let outcome: serde_json::Value = response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreadable(&error))?;
         Ok(outcome["outcome"]
             .as_str()
             .unwrap_or("SSH key deleted")
@@ -1114,17 +981,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get("/api/v1/system/security")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/security returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn update_security_policy(
@@ -1133,20 +997,17 @@ impl MindClient for GatewayMindClient {
     ) -> Result<cybou_protocol::system::SecurityPolicyRecord, ClientError> {
         let response = Request::post("/api/v1/system/security/policy")
             .json(&req)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/security/policy returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn get_backup_settings(
@@ -1155,17 +1016,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get("/api/v1/system/backup")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/backup returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn trigger_backup(
@@ -1174,20 +1032,17 @@ impl MindClient for GatewayMindClient {
     ) -> Result<cybou_protocol::system::BackupArchiveRecord, ClientError> {
         let response = Request::post("/api/v1/system/backup/trigger")
             .json(&cybou_web_contracts::TriggerBackupRequest { name })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/backup/trigger returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn restore_archive(
@@ -1200,20 +1055,17 @@ impl MindClient for GatewayMindClient {
                 archive_id: archive_id.to_owned(),
                 target_path,
             })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/backup/restore returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         let outcome: serde_json::Value = response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreadable(&error))?;
         Ok(outcome["outcome"]
             .as_str()
             .unwrap_or("Archive restored")
@@ -1226,20 +1078,17 @@ impl MindClient for GatewayMindClient {
     ) -> Result<cybou_protocol::system::BackupScheduleRecord, ClientError> {
         let response = Request::post("/api/v1/system/backup/schedule")
             .json(&req)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/system/backup/schedule returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn get_mail(
@@ -1269,17 +1118,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get(&url)
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/personal/mail returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn send_mail(
@@ -1288,37 +1134,31 @@ impl MindClient for GatewayMindClient {
     ) -> Result<cybou_protocol::personal::MailMessageRecord, ClientError> {
         let response = Request::post("/api/v1/personal/mail/send")
             .json(&req)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/personal/mail/send returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn get_calendar(&self) -> Result<cybou_web_contracts::CalendarProjection, ClientError> {
         let response = Request::get("/api/v1/personal/calendar")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/personal/calendar returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn create_calendar_event(
@@ -1327,37 +1167,31 @@ impl MindClient for GatewayMindClient {
     ) -> Result<cybou_protocol::personal::CalendarEventRecord, ClientError> {
         let response = Request::post("/api/v1/personal/calendar/events")
             .json(&req)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/personal/calendar/events returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn get_notes(&self) -> Result<cybou_web_contracts::NotesProjection, ClientError> {
         let response = Request::get("/api/v1/personal/notes")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/personal/notes returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn create_note(
@@ -1366,20 +1200,17 @@ impl MindClient for GatewayMindClient {
     ) -> Result<cybou_protocol::personal::NoteRecord, ClientError> {
         let response = Request::post("/api/v1/personal/notes")
             .json(&req)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/personal/notes returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn update_note(
@@ -1388,37 +1219,31 @@ impl MindClient for GatewayMindClient {
     ) -> Result<cybou_protocol::personal::NoteRecord, ClientError> {
         let response = Request::post("/api/v1/personal/notes/update")
             .json(&req)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/personal/notes/update returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn get_contacts(&self) -> Result<cybou_web_contracts::ContactsProjection, ClientError> {
         let response = Request::get("/api/v1/personal/contacts")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/personal/contacts returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn create_contact(
@@ -1427,20 +1252,17 @@ impl MindClient for GatewayMindClient {
     ) -> Result<cybou_protocol::personal::ContactRecord, ClientError> {
         let response = Request::post("/api/v1/personal/contacts")
             .json(&req)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/personal/contacts returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn get_cognitive_graph(
@@ -1454,17 +1276,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get(&url)
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/cognitive/graph returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn query_cognitive_graph(
@@ -1473,20 +1292,17 @@ impl MindClient for GatewayMindClient {
     ) -> Result<cybou_web_contracts::CognitiveGraphProjection, ClientError> {
         let response = Request::post("/api/v1/cognitive/query")
             .json(&req)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/cognitive/query returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn get_event_journal(
@@ -1509,17 +1325,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get(&url)
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/cognitive/journal returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn interpret_meaning(
@@ -1528,20 +1341,17 @@ impl MindClient for GatewayMindClient {
     ) -> Result<cybou_web_contracts::MeaningInterpretProjection, ClientError> {
         let response = Request::post("/api/v1/meaning/interpret")
             .json(req)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/meaning/interpret returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn get_dialogue_memory(
@@ -1550,17 +1360,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get("/api/v1/meaning/dialogue")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/meaning/dialogue returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn get_learning_candidates(
@@ -1575,17 +1382,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get(&url)
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "{url} returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn propose_learning_candidate(
@@ -1594,20 +1398,17 @@ impl MindClient for GatewayMindClient {
     ) -> Result<cybou_protocol::learning::LearningCandidate, ClientError> {
         let response = Request::post("/api/v1/learning/candidates")
             .json(req)
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/learning/candidates returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn evaluate_learning_candidate(
@@ -1618,17 +1419,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::post(&url)
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "{url} returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn get_learned_artifacts(
@@ -1637,17 +1435,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get("/api/v1/learning/artifacts")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/learning/artifacts returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 
     async fn revoke_learned_artifact(
@@ -1661,15 +1456,12 @@ impl MindClient for GatewayMindClient {
                 artifact_id,
                 reason: reason.to_string(),
             })
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "{url} returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         Ok(())
     }
@@ -1680,17 +1472,14 @@ impl MindClient for GatewayMindClient {
         let response = Request::get("/api/v1/governance/scopes")
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         if !response.ok() {
-            return Err(ClientError::GatewayRequest(format!(
-                "/api/v1/governance/scopes returned HTTP {}",
-                response.status()
-            )));
+            return Err(ClientError::refused(response.status(), None));
         }
         response
             .json()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))
+            .map_err(|error| ClientError::unreadable(&error))
     }
 }
 
@@ -1702,10 +1491,10 @@ impl GatewayMindClient {
                 "username": username,
                 "password": password,
             }))
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?
+            .map_err(|error| ClientError::malformed(&error))?
             .send()
             .await
-            .map_err(|error| ClientError::GatewayRequest(error.to_string()))?;
+            .map_err(|error| ClientError::unreachable(&error))?;
         Ok(response.status() == 200)
     }
 
