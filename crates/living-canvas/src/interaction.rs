@@ -744,12 +744,15 @@ pub fn spawn_or_focus_card(
         if let Some(camera) = use_context::<crate::components::camera_context::CanvasCamera>() {
             let geom = layout.get_untracked().geometry(target);
             if !camera.shows(geom) {
-                let camera_history = use_context::<RwSignal<crate::layout::camera::CameraHistory>>();
+                let camera_history =
+                    use_context::<RwSignal<crate::layout::camera::CameraHistory>>();
                 let pan = use_context::<ReadSignal<(f64, f64)>>();
                 let set_pan = use_context::<WriteSignal<(f64, f64)>>();
                 let zoom = use_context::<ReadSignal<f64>>();
                 let set_zoom = use_context::<WriteSignal<f64>>();
-                if let (Some(pan), Some(set_pan), Some(zoom), Some(set_zoom)) = (pan, set_pan, zoom, set_zoom) {
+                if let (Some(pan), Some(set_pan), Some(zoom), Some(set_zoom)) =
+                    (pan, set_pan, zoom, set_zoom)
+                {
                     let center_x = geom.x + geom.width / 2.0;
                     let center_y = geom.y + geom.height / 2.0;
                     let target_zoom = zoom.get_untracked().clamp(0.7, 1.2);
@@ -768,4 +771,3 @@ pub fn spawn_or_focus_card(
         }
     }
 }
-

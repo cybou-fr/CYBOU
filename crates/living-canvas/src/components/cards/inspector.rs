@@ -105,12 +105,21 @@ pub fn InspectorContent(
 
     let inspection_state_display = move || {
         if let Some(svc) = live_service() {
-            format!("Operational (State: {:?}, Substate: {})", svc.state, svc.substate)
+            format!(
+                "Operational (State: {:?}, Substate: {})",
+                svc.state, svc.substate
+            )
         } else if let Some(proc) = live_process() {
             let mem_mb = proc.memory_bytes / (1024 * 1024);
-            format!("Running (State: {}, CPU: {:.1}%, RSS: {mem_mb} MB)", proc.state, proc.cpu_percent)
+            format!(
+                "Running (State: {}, CPU: {:.1}%, RSS: {mem_mb} MB)",
+                proc.state, proc.cpu_percent
+            )
         } else if let Some(agent) = live_agent() {
-            format!("Supervised (Standing: {:?}, Workspace: {})", agent.standing, agent.workspace)
+            format!(
+                "Supervised (Standing: {:?}, Workspace: {})",
+                agent.standing, agent.workspace
+            )
         } else if let Some(cybou_protocol::SubjectRef::File { location }) = target.get() {
             format!("Bounded file storage: {}", location.display_path())
         } else if target.get().is_some() {
@@ -139,12 +148,21 @@ pub fn InspectorContent(
     let last_observed_display = move || {
         if let Some(svc) = live_service() {
             let pid_desc = svc.main_pid.map_or("no pid".into(), |p| format!("PID {p}"));
-            let mem_desc = svc.memory_bytes.map_or("unknown mem".into(), |b| format!("{} MB", b / (1024 * 1024)));
+            let mem_desc = svc.memory_bytes.map_or("unknown mem".into(), |b| {
+                format!("{} MB", b / (1024 * 1024))
+            });
             format!("{pid_desc}, {mem_desc}, enabled: {}", svc.enabled)
         } else if let Some(proc) = live_process() {
-            format!("Threads: {}, User: {}, PPID: {}", proc.threads, proc.user, proc.ppid)
+            format!(
+                "Threads: {}, User: {}, PPID: {}",
+                proc.threads, proc.user, proc.ppid
+            )
         } else if let Some(agent) = live_agent() {
-            format!("Expires: {}, Model: {}", agent.expires_at.date(), agent.model_class.as_deref().unwrap_or("none"))
+            format!(
+                "Expires: {}, Model: {}",
+                agent.expires_at.date(),
+                agent.model_class.as_deref().unwrap_or("none")
+            )
         } else if target.get().is_some() {
             "Observation pending owner stream refresh".to_string()
         } else {

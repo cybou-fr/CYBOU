@@ -32,7 +32,9 @@ pub fn active_dynamic_relations(
     // 1. Services -> Inspector (when Inspector inspects a service)
     if layout.contains_card(CardId::Services(0)) && layout.contains_card(CardId::Inspector(0)) {
         let inspector_signals = tool_states.inspector(CardId::Inspector(0));
-        if let Some(cybou_protocol::SubjectRef::Service { .. }) = inspector_signals.target_subject.get() {
+        if let Some(cybou_protocol::SubjectRef::Service { .. }) =
+            inspector_signals.target_subject.get()
+        {
             relations.push(DynamicRelation {
                 from: CardId::Services(0),
                 to: CardId::Inspector(0),
@@ -58,7 +60,9 @@ pub fn active_dynamic_relations(
     // 3. Processes -> Inspector (when Inspector inspects a process)
     if layout.contains_card(CardId::Processes(0)) && layout.contains_card(CardId::Inspector(0)) {
         let inspector_signals = tool_states.inspector(CardId::Inspector(0));
-        if let Some(cybou_protocol::SubjectRef::Process { .. }) = inspector_signals.target_subject.get() {
+        if let Some(cybou_protocol::SubjectRef::Process { .. }) =
+            inspector_signals.target_subject.get()
+        {
             relations.push(DynamicRelation {
                 from: CardId::Processes(0),
                 to: CardId::Inspector(0),
@@ -111,7 +115,9 @@ pub fn active_dynamic_relations(
     // 8. FileManager -> Inspector (when inspecting file metadata)
     if layout.contains_card(CardId::FileManager(0)) && layout.contains_card(CardId::Inspector(0)) {
         let inspector_signals = tool_states.inspector(CardId::Inspector(0));
-        if let Some(cybou_protocol::SubjectRef::File { .. }) = inspector_signals.target_subject.get() {
+        if let Some(cybou_protocol::SubjectRef::File { .. }) =
+            inspector_signals.target_subject.get()
+        {
             relations.push(DynamicRelation {
                 from: CardId::FileManager(0),
                 to: CardId::Inspector(0),
@@ -138,11 +144,17 @@ pub fn active_dynamic_relations(
     }
 
     // 10. Notifications -> Inspector (when notifications reference inspected entity)
-    if layout.contains_card(CardId::Notifications(0)) && layout.contains_card(CardId::Inspector(0)) {
+    if layout.contains_card(CardId::Notifications(0)) && layout.contains_card(CardId::Inspector(0))
+    {
         let notif_signals = tool_states.notifications(CardId::Notifications(0));
         let inspector_signals = tool_states.inspector(CardId::Inspector(0));
         if let Some(target) = inspector_signals.target_subject.get() {
-            if notif_signals.notifications.get().iter().any(|n| n.subject.as_ref() == Some(&target)) {
+            if notif_signals
+                .notifications
+                .get()
+                .iter()
+                .any(|n| n.subject.as_ref() == Some(&target))
+            {
                 relations.push(DynamicRelation {
                     from: CardId::Notifications(0),
                     to: CardId::Inspector(0),
@@ -158,7 +170,12 @@ pub fn active_dynamic_relations(
         let op_signals = tool_states.operations(CardId::Operations(0));
         let inspector_signals = tool_states.inspector(CardId::Inspector(0));
         if let Some(target) = inspector_signals.target_subject.get() {
-            if op_signals.operations.get().iter().any(|op| op.subject.as_ref() == Some(&target)) {
+            if op_signals
+                .operations
+                .get()
+                .iter()
+                .any(|op| op.subject.as_ref() == Some(&target))
+            {
                 relations.push(DynamicRelation {
                     from: CardId::Operations(0),
                     to: CardId::Inspector(0),
@@ -259,9 +276,7 @@ pub fn RelationshipsLayer(
     };
 
     let dynamic_edges = move || {
-        tool_states.map_or_else(Vec::new, |ts| {
-            active_dynamic_relations(&layout.get(), &ts)
-        })
+        tool_states.map_or_else(Vec::new, |ts| active_dynamic_relations(&layout.get(), &ts))
     };
 
     view! {

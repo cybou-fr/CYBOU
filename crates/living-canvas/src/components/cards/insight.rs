@@ -170,16 +170,25 @@ fn FindingRow(finding: FindingProjection, runtime: RwSignal<RuntimeState>) -> im
         move |_| {
             let target_name = about.as_ref().or(first_subject.as_ref()).cloned();
             if let Some(target) = target_name {
-                let clean_name = target.strip_prefix("service:").unwrap_or(&target).to_owned();
+                let clean_name = target
+                    .strip_prefix("service:")
+                    .unwrap_or(&target)
+                    .to_owned();
                 let inspector_signals = tool_states.inspector(crate::CardId::Inspector(0));
                 inspector_signals.subject_query.set(None);
-                inspector_signals.target_subject.set(Some(cybou_protocol::SubjectRef::Service {
-                    name: clean_name,
-                    node_id: None,
-                }));
+                inspector_signals
+                    .target_subject
+                    .set(Some(cybou_protocol::SubjectRef::Service {
+                        name: clean_name,
+                        node_id: None,
+                    }));
             }
             if let Some(lay) = layout {
-                crate::interaction::spawn_or_focus_card(lay, crate::CardId::Inspector(0), Some(crate::CardId::Insight));
+                crate::interaction::spawn_or_focus_card(
+                    lay,
+                    crate::CardId::Inspector(0),
+                    Some(crate::CardId::Insight),
+                );
             }
         }
     };

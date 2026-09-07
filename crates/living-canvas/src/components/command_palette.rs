@@ -786,7 +786,9 @@ pub fn CommandPalette(
                 if !camera.shows(geom) {
                     let cx = geom.x + geom.width / 2.0;
                     let cy = geom.y + geom.height / 2.0;
-                    let target_z = camera_zoom.map_or(1.0, |z| z.get_untracked()).clamp(0.7, 1.2);
+                    let target_z = camera_zoom
+                        .map_or(1.0, |z| z.get_untracked())
+                        .clamp(0.7, 1.2);
                     fly_to(cx, cy, target_z);
                 }
             }
@@ -946,7 +948,9 @@ pub fn CommandPalette(
                 notes_signals.edit_content.set(content);
                 notes_signals.edit_tags.set(tags.join(", "));
                 notes_signals.edit_pinned.set(is_pinned);
-                notes_signals.edit_referenced_subject.set(referenced_subject);
+                notes_signals
+                    .edit_referenced_subject
+                    .set(referenced_subject);
             }
             focus_or_open_card(CardId::Notes(0));
         }
@@ -969,7 +973,8 @@ pub fn CommandPalette(
 
     let ask_answer = move || crate::state::ask_cybou(&command_query.get(), &runtime.get());
 
-    let (meaning_result, set_meaning_result) = signal(Option::<cybou_web_contracts::MeaningInterpretProjection>::None);
+    let (meaning_result, set_meaning_result) =
+        signal(Option::<cybou_web_contracts::MeaningInterpretProjection>::None);
     let (_meaning_loading, set_meaning_loading) = signal(false);
 
     Effect::new(move |_| {
@@ -1270,4 +1275,3 @@ mod tests {
         assert!(command_matches("database", &note_text));
     }
 }
-

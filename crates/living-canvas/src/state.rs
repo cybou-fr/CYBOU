@@ -476,7 +476,9 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
             } => {
                 let mem_finding = insight.findings.iter().find(|f| {
                     f.finding.to_lowercase().contains("mem")
-                        || f.readings.iter().any(|r| r.subject.contains("mem") || r.subject.contains("ram"))
+                        || f.readings
+                            .iter()
+                            .any(|r| r.subject.contains("mem") || r.subject.contains("ram"))
                 });
 
                 if let Some(f) = mem_finding {
@@ -495,7 +497,8 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
             }
             _ => Some(AskCybouAnswer {
                 headline: "Memory monitor".to_string(),
-                detail: "Check current RAM and swap usage across processes and system caches.".to_string(),
+                detail: "Check current RAM and swap usage across processes and system caches."
+                    .to_string(),
                 target: Some(("Open System Monitor", crate::CardId::Monitor(0))),
             }),
         };
@@ -516,7 +519,9 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
             } => {
                 let cpu_finding = insight.findings.iter().find(|f| {
                     f.finding.to_lowercase().contains("cpu")
-                        || f.readings.iter().any(|r| r.subject.contains("cpu") || r.subject.contains("load"))
+                        || f.readings
+                            .iter()
+                            .any(|r| r.subject.contains("cpu") || r.subject.contains("load"))
                 });
 
                 if let Some(f) = cpu_finding {
@@ -568,7 +573,8 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
             }
             _ => Some(AskCybouAnswer {
                 headline: "System logs & audit".to_string(),
-                detail: "Inspect journald system event streams and tamper-evident audit trail.".to_string(),
+                detail: "Inspect journald system event streams and tamper-evident audit trail."
+                    .to_string(),
                 target: Some(("Open System Logs", crate::CardId::SystemLogs(0))),
             }),
         };
@@ -587,7 +593,8 @@ pub fn ask_cybou(query: &str, state: &RuntimeState) -> Option<AskCybouAnswer> {
     {
         return Some(AskCybouAnswer {
             headline: "Storage & Volume status".to_string(),
-            detail: "Inspect mounted filesystems, disk usage allocations, and snapshots.".to_string(),
+            detail: "Inspect mounted filesystems, disk usage allocations, and snapshots."
+                .to_string(),
             target: Some(("Open Storage Manager", crate::CardId::Storage(0))),
         });
     }
