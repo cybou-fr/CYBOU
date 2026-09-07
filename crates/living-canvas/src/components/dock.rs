@@ -7,14 +7,37 @@ use cybou_web_contracts::SessionMode;
 use leptos::prelude::*;
 use wasm_bindgen::{JsCast, closure::Closure};
 
+use crate::applications::DOCK_APPLICATIONS;
 use crate::instant_label;
 use crate::{
     ArrangementMode, CardId, DesktopItemId, DesktopLayout,
-    components::icons::{IconBell, IconBot, IconFolder, IconHome, IconRefresh, IconShield},
+    components::icons::{IconBell, IconFolder, IconGrid, IconHome, IconShield},
     state::RuntimeState,
 };
 
+/// The glyph for one docked application.
+///
+/// A match rather than a field on the card: an icon is a fact about this dock, and putting it on
+/// [`CardId`] would make the layout engine depend on an icon set.
+#[component]
+fn DockGlyph(card: CardId) -> impl IntoView {
+    match card {
+        CardId::FileManager(_) => view! { <IconFolder size=18 /> }.into_any(),
+        CardId::Terminal(_) => view! { <lucide_leptos::SquareTerminal size=18 /> }.into_any(),
+        CardId::Services(_) => view! { <lucide_leptos::Cog size=18 /> }.into_any(),
+        CardId::SystemLogs(_) => view! { <lucide_leptos::ScrollText size=18 /> }.into_any(),
+        CardId::Monitor(_) => view! { <lucide_leptos::SquareActivity size=18 /> }.into_any(),
+        // Every docked card is named above. A new one is drawn rather than dropped, and looks
+        // plain enough that whoever added it can see it needs a glyph.
+        _ => view! { <IconGrid size=18 /> }.into_any(),
+    }
+}
+
 /// Bottom desktop taskbar dock component.
+#[expect(
+    clippy::too_many_lines,
+    reason = "one bar: the applications on it, the anchors, the open windows and the tray"
+)]
 #[component]
 pub fn DesktopDock(
     layout: RwSignal<DesktopLayout>,
@@ -22,6 +45,7 @@ pub fn DesktopDock(
     set_selected: WriteSignal<Option<DesktopItemId>>,
     auth_modal_open: RwSignal<bool>,
     runtime: RwSignal<RuntimeState>,
+    launcher_open: RwSignal<bool>,
 ) -> impl IntoView {
     let (time_str, set_time_str) = signal(String::new());
     let pan = use_context::<ReadSignal<(f64, f64)>>();
@@ -151,8 +175,8 @@ pub fn DesktopDock(
             aria-label="Desktop Card Shelf and Taskbar"
         >
             <div class="dock-apps">
-                <div class="dock-group" role="group" aria-label="Start">
-                <button
+                <div class="dock-group" role="group" aria-label="Applications">
+                    <button
                         class="dock-item"
                         class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "insight"))
                         title="Home / System Overview"
@@ -164,276 +188,34 @@ pub fn DesktopDock(
                         <IconHome size=18 />
                         <span class="dock-tooltip">"Home"</span>
                     </button>
-                </div>
-                <div class="dock-group" role="group" aria-label="Work">
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "files"))
-                        title="File Manager"
-                        on:click=move |_| open_or_focus(CardId::FileManager(0))
+                    {DOCK_APPLICATIONS
+                        .into_iter()
+                        .map(|card| {
+                            let key = card.key();
+                            let title = card.title();
+                            view! {
+                                <button
+                                    class="dock-item"
+                                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(open) if open.key() == key))
+                                    title=title
+                                    on:click=move |_| open_or_focus(card)
+                                >
+                                    <DockGlyph card=card />
+                                    <span class="dock-tooltip">{title}</span>
+                                </button>
+                            }
+                        })
+                        .collect_view()}
+                    <button
+                        class="dock-item dock-launcher"
+                        class:active=move || launcher_open.get()
+                        title="Applications"
+                        aria-haspopup="dialog"
+                        aria-expanded=move || launcher_open.get().to_string()
+                        on:click=move |_| launcher_open.update(|open| *open = !*open)
                     >
-                        <IconFolder size=18 />
-                        <span class="dock-tooltip">"Files"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "editor"))
-                        title="Text Editor"
-                        on:click=move |_| open_or_focus(CardId::Editor(0))
-                    >
-                        <lucide_leptos::FilePen size=18 />
-                        <span class="dock-tooltip">"Editor"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "diff"))
-                        title="Diff Viewer"
-                        on:click=move |_| open_or_focus(CardId::Diff(0))
-                    >
-                        <lucide_leptos::GitCompare size=18 />
-                        <span class="dock-tooltip">"Diff"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "terminal"))
-                        title="Terminal — runs as your account"
-                        on:click=move |_| open_or_focus(CardId::Terminal(0))
-                    >
-                        <lucide_leptos::SquareTerminal size=18 />
-                        <span class="dock-tooltip">"Terminal"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "inspector"))
-                        title="Universal Inspector"
-                        on:click=move |_| open_or_focus(CardId::Inspector(0))
-                    >
-                        <lucide_leptos::Search size=18 />
-                        <span class="dock-tooltip">"Inspector"</span>
-                    </button>
-                </div>
-                <div class="dock-group" role="group" aria-label="System">
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "services"))
-                        title="Services Manager"
-                        on:click=move |_| open_or_focus(CardId::Services(0))
-                    >
-                        <lucide_leptos::Cog size=18 />
-                        <span class="dock-tooltip">"Services"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "processes"))
-                        title="Process Manager"
-                        on:click=move |_| open_or_focus(CardId::Processes(0))
-                    >
-                        <lucide_leptos::Server size=18 />
-                        <span class="dock-tooltip">"Processes"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "monitor"))
-                        title="System Monitor"
-                        on:click=move |_| open_or_focus(CardId::Monitor(0))
-                    >
-                        <lucide_leptos::SquareActivity size=18 />
-                        <span class="dock-tooltip">"Monitor"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "system-logs"))
-                        title="System Logs"
-                        on:click=move |_| open_or_focus(CardId::SystemLogs(0))
-                    >
-                        <lucide_leptos::ScrollText size=18 />
-                        <span class="dock-tooltip">"Logs"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "storage"))
-                        title="Storage & Snapshots"
-                        on:click=move |_| open_or_focus(CardId::Storage(0))
-                    >
-                        <lucide_leptos::HardDrive size=18 />
-                        <span class="dock-tooltip">"Storage"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "network"))
-                        title="Network Connections"
-                        on:click=move |_| open_or_focus(CardId::Network(0))
-                    >
-                        <lucide_leptos::Network size=18 />
-                        <span class="dock-tooltip">"Network"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "packages"))
-                        title="Package Manager"
-                        on:click=move |_| open_or_focus(CardId::Packages(0))
-                    >
-                        <lucide_leptos::Package size=18 />
-                        <span class="dock-tooltip">"Packages"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "updates"))
-                        title="System Updates"
-                        on:click=move |_| open_or_focus(CardId::Updates(0))
-                    >
-                        <IconRefresh size=18 />
-                        <span class="dock-tooltip">"Updates"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "user-settings"))
-                        title="Users & SSH Keys"
-                        on:click=move |_| open_or_focus(CardId::UserSettings(0))
-                    >
-                        <lucide_leptos::IdCard size=18 />
-                        <span class="dock-tooltip">"Users"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "security"))
-                        title="Security & Sandboxing"
-                        on:click=move |_| open_or_focus(CardId::Security(0))
-                    >
-                        <IconShield size=18 />
-                        <span class="dock-tooltip">"Security"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "backup"))
-                        title="Backup Vault"
-                        on:click=move |_| open_or_focus(CardId::Backup(0))
-                    >
-                        <lucide_leptos::Archive size=18 />
-                        <span class="dock-tooltip">"Backup"</span>
-                    </button>
-                </div>
-                <div class="dock-group" role="group" aria-label="Personal">
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "mail"))
-                        title="Mail & Messages"
-                        on:click=move |_| open_or_focus(CardId::Mail(0))
-                    >
-                        <lucide_leptos::Mail size=18 />
-                        <span class="dock-tooltip">"Mail"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "calendar"))
-                        title="Calendar & Schedule"
-                        on:click=move |_| open_or_focus(CardId::Calendar(0))
-                    >
-                        <lucide_leptos::Calendar size=18 />
-                        <span class="dock-tooltip">"Calendar"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "notes"))
-                        title="Notes & Ideas"
-                        on:click=move |_| open_or_focus(CardId::Notes(0))
-                    >
-                        <lucide_leptos::StickyNote size=18 />
-                        <span class="dock-tooltip">"Notes"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "contacts"))
-                        title="Contacts Directory"
-                        on:click=move |_| open_or_focus(CardId::Contacts(0))
-                    >
-                        <lucide_leptos::Contact size=18 />
-                        <span class="dock-tooltip">"Contacts"</span>
-                    </button>
-                </div>
-                <div class="dock-group" role="group" aria-label="Mind">
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "agents"))
-                        title="Agents"
-                        on:click=move |_| open_or_focus(CardId::Agents)
-                    >
-                        <lucide_leptos::UsersRound size=18 />
-                        <span class="dock-tooltip">"Agents"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "meaning"))
-                        title="Meaning & Dialogue Assistant"
-                        on:click=move |_| open_or_focus(CardId::Meaning(0))
-                    >
-                        <IconBot size=18 />
-                        <span class="dock-tooltip">"Meaning"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "cognitive-graph"))
-                        title="Cognitive Graph & Causal DAG"
-                        on:click=move |_| open_or_focus(CardId::CognitiveGraph(0))
-                    >
-                        <lucide_leptos::Waypoints size=18 />
-                        <span class="dock-tooltip">"Cognitive Graph"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "event-journal"))
-                        title="Canonical Event1 Journal"
-                        on:click=move |_| open_or_focus(CardId::EventJournal(0))
-                    >
-                        <lucide_leptos::BookOpen size=18 />
-                        <span class="dock-tooltip">"Event Journal"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "learning"))
-                        title="Lifelong Learning & Governance"
-                        on:click=move |_| open_or_focus(CardId::Learning(0))
-                    >
-                        <lucide_leptos::BookOpenCheck size=18 />
-                        <span class="dock-tooltip">"Learning"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "outline"))
-                        title="Canvas Outline"
-                        on:click=move |_| open_or_focus(CardId::Outline)
-                    >
-                        <lucide_leptos::ListTree size=18 />
-                        <span class="dock-tooltip">"Outline"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        title="Mind Explorer"
-                        on:click=move |_| {
-                            layout.update(|l| l.apply_arrangement(ArrangementMode::Relations, None));
-                            open_or_focus(CardId::Context);
-                        }
-                    >
-                        <lucide_leptos::Brain size=18 />
-                        <span class="dock-tooltip">"Mind"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "operations"))
-                        title="Operations Monitor"
-                        on:click=move |_| open_or_focus(CardId::Operations(0))
-                    >
-                        <lucide_leptos::Workflow size=18 />
-                        <span class="dock-tooltip">"Operations"</span>
-                    </button>
-                <button
-                        class="dock-item"
-                        class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "notifications"))
-                        title="Notifications Center"
-                        on:click=move |_| open_or_focus(CardId::Notifications(0))
-                    >
-                        <IconBell size=18 />
-                        <span class="dock-tooltip">"Notifications"</span>
+                        <IconGrid size=18 />
+                        <span class="dock-tooltip">"Applications"</span>
                     </button>
                 </div>
             </div>
@@ -500,6 +282,24 @@ pub fn DesktopDock(
             </div>
 
             <div class="dock-tray">
+                // What is running and what is waiting are status, not applications: a person
+                // glances at them and only sometimes opens them, which is what a tray is for.
+                <button
+                    class="dock-tray-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "operations"))
+                    title="Running operations"
+                    on:click=move |_| open_or_focus(CardId::Operations(0))
+                >
+                    <lucide_leptos::Workflow size=14 />
+                </button>
+                <button
+                    class="dock-tray-item"
+                    class:active=move || selected.get().as_ref().is_some_and(|item| matches!(item, DesktopItemId::Card(card) if card.key() == "notifications"))
+                    title="Notifications"
+                    on:click=move |_| open_or_focus(CardId::Notifications(0))
+                >
+                    <IconBell size=14 />
+                </button>
                 <button
                     class="dock-tray-user"
                     class:public-preview=is_public_preview

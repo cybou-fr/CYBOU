@@ -2121,6 +2121,82 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   transition: all 120ms ease;
 }
 .dock-tray-user:hover { background: rgba(56, 189, 248, 0.2); }
+/* Status, not an application: small, unlabelled, and only accented while its card is the one
+   selected. */
+.dock-tray-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.dock-tray-item:hover { background: rgba(154, 167, 184, 0.14); color: #dfe8ed; }
+.dock-tray-item.active { color: var(--accent); }
+
+/* The one dock button that opens a panel rather than a card, marked while that panel is up. */
+.dock-launcher.active { color: var(--accent); background: rgba(112, 225, 200, 0.12); }
+
+/* --- Applications launcher ------------------------------------------------------------------ */
+/* The catalogue the dock stopped being. It stands above the dock rather than inside it, and the
+   backdrop is what closes it: a panel dismissible only by the button that opened it is one people
+   learn not to open. */
+.launcher-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 8, 14, 0.4);
+  z-index: 95;
+}
+.launcher {
+  position: fixed;
+  left: 50%;
+  bottom: 72px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(60vh, 560px);
+  padding: 16px 18px;
+  background: rgba(8, 16, 26, 0.96);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(154, 167, 184, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  z-index: 96;
+}
+.launcher-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.launcher-title { color: #dfe8ed; font-size: 13px; font-weight: 500; }
+.launcher-hint { color: var(--muted); font-size: 10px; }
+.launcher-body { display: grid; gap: 14px; overflow-y: auto; }
+.launcher-category { display: grid; gap: 6px; }
+.launcher-category-title {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.launcher-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.launcher-entry {
+  padding: 7px 10px;
+  border: 1px solid rgba(154, 167, 184, 0.16);
+  border-radius: 8px;
+  background: transparent;
+  color: #dfe8ed;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.launcher-entry:hover { border-color: rgba(112, 225, 200, 0.4); color: var(--accent); }
 .dock-tray-clock { font-family: ui-monospace, monospace; font-size: 11px; color: var(--muted); }
 
 /* Minimap node for Intent */

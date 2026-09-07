@@ -13,8 +13,8 @@ use living_canvas::{
     CameraHistory, ClientError, DesktopLayout, DesktopViewMode, GatewayMindClient, LayoutHistory,
     MindClient, SnapGuide, apply_camera_back, apply_camera_forward,
     components::{
-        AuthModal, CanvasViewport, CommandPalette, DesktopDock, IconGrid, IconMaximize, Minimap,
-        SignInView, Topbar,
+        AuthModal, CanvasViewport, CommandPalette, DesktopDock, IconGrid, IconMaximize, Launcher,
+        Minimap, SignInView, Topbar,
     },
     interaction::{DragState, ResizeState, apply_redo, apply_undo},
     state::{DesktopRuntimeSubscription, RuntimeState},
@@ -108,6 +108,10 @@ pub fn App() -> impl IntoView {
     // dismissal holds wherever the Attention card happens to be mounted, and session-local because
     // the grounds for an offer will have changed by the next time this desktop is opened.
     provide_context::<living_canvas::components::SpatialEngagement>(RwSignal::new(Vec::new()));
+    // Whether the catalogue is showing. Owned here rather than by the Dock: the panel it opens is
+    // the Dock's sibling, not its child, so that a launcher covering the canvas is not drawn inside
+    // the bar it came from.
+    let launcher_open = RwSignal::new(false);
     let history = RwSignal::new(LayoutHistory::new());
     let camera_history = RwSignal::new(CameraHistory::new());
     provide_context(camera_history);
@@ -423,12 +427,15 @@ pub fn App() -> impl IntoView {
                 camera_history=camera_history
             />
 
+            <Launcher layout=layout set_selected=set_selected open=launcher_open />
+
             <DesktopDock
                 selected=selected
                 set_selected=set_selected
                 layout=layout
                 auth_modal_open=auth_modal_open
                 runtime=runtime
+                launcher_open=launcher_open
             />
 
             <section class="canvas-controls" aria-label="Canvas viewport navigation">
