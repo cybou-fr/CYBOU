@@ -292,13 +292,56 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .object.expanded { border-color: rgba(112, 225, 200, 0.55); box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55); }
 .object.standard { border-color: var(--border); }
 .card-header { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px; }
-.card-controls { display: flex; align-items: center; gap: 3px; opacity: 0.55; transition: opacity 140ms ease; }
+.card-controls { position: relative; display: flex; align-items: center; gap: 3px; opacity: 0.55; transition: opacity 140ms ease; }
 .object:hover .card-controls, .object.selected .card-controls, .object.pinned .card-controls { opacity: 1; }
 .card-control-btn { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; transition: background 120ms ease, color 120ms ease; }
 .card-control-btn.representation-btn { font-size: 9px; font-weight: 600; text-transform: uppercase; }
 .panel-representation-badge { font-size: 8px; color: var(--accent); padding: 1px 4px; border-radius: 4px; background: rgba(112, 225, 200, 0.12); margin-left: 4px; }
 .card-control-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
 .card-control-btn.active { color: var(--accent); background: rgba(112, 225, 200, 0.14); }
+/* The one header button that opens something rather than doing something. */
+.card-control-btn.more-btn { font-size: 12px; }
+
+/* Everything a card can do that is not needed constantly. Anchored to the header it came from,
+   above the cards but below the dock, and dismissed by anything outside it. */
+.card-menu-backdrop { position: fixed; inset: 0; z-index: 60; }
+.card-menu {
+  position: absolute;
+  top: 26px;
+  right: 0;
+  z-index: 61;
+  display: grid;
+  gap: 1px;
+  min-width: 168px;
+  padding: 5px;
+  background: rgba(8, 16, 26, 0.97);
+  border: 1px solid rgba(154, 167, 184, 0.2);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  text-align: left;
+}
+.card-menu-item {
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #dfe8ed;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.card-menu-item:hover { background: rgba(255, 255, 255, 0.08); }
+/* The panel size a card is already at, marked rather than merely listed: a set of three choices
+   with none of them shown as current is a set a person has to try to read. */
+.card-menu-item.selected { color: var(--accent); background: rgba(112, 225, 200, 0.12); }
+.card-menu-separator { height: 1px; margin: 4px 2px; background: rgba(154, 167, 184, 0.16); }
+.card-menu-label {
+  padding: 4px 9px 2px;
+  color: var(--muted);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
 .card-collapsed-summary { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .card-collapsed-summary b { color: #dfe8ed; font-weight: 550; }
 .card-resize-handle { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; display: flex; align-items: flex-end; justify-content: flex-end; padding: 2px; color: rgba(154, 167, 184, 0.35); cursor: nwse-resize; touch-action: none; z-index: 10; transition: color 120ms ease; }
